@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "swift-gui-verifiable-loop run manifest",
+  "type": "object",
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "results_bundle": {
+      "type": "string"
+    },
+    "summary_json": {
+      "type": "string"
+    },
+    "toolchain_fingerprint": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "results_bundle",
+    "summary_json",
+    "toolchain_fingerprint"
+  ],
+  "additionalProperties": true
+}
