@@ -17,5 +17,11 @@ fi
 
 mkdir -p "$(dirname "$OUT")"
 
-# Prefer the structured subcommand for stability.
-xcrun xcresulttool get test-results summary --path "$BUNDLE" --format json > "$OUT"
+# Prefer the structured subcommand for stability (Xcode 16+).
+# Fall back to legacy "get --format json" when running on older Xcodes.
+if xcrun xcresulttool get test-results summary --help >/dev/null 2>&1; then
+  xcrun xcresulttool get test-results summary --path "$BUNDLE" --compact > "$OUT"
+else
+  # Legacy output is large, but still machine-parseable JSON.
+  xcrun xcresulttool get --path "$BUNDLE" --format json > "$OUT"
+fi

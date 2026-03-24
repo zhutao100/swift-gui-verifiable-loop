@@ -1,28 +1,42 @@
-import XCTest
 import SnapshotTesting
 import SwiftUI
+import XCTest
 
 // Example: snapshot a SwiftUI view in stable states.
-// Policy: gate recording behind an env var so CI cannot mutate baselines.
+//
+// Recording policy:
+// - Local: allow recording missing snapshots (SnapshotTesting default) and re-record explicitly.
+// - CI: never record (missing snapshots should fail deterministically).
+//
+// To intentionally re-record snapshots locally:
+//   SNAPSHOT_RECORD=1 xcodebuild ... test
 
+@MainActor
 final class ExampleSnapshotTests: XCTestCase {
 
-  override func setUp() {
-    super.setUp()
+  override func invokeTest() {
+    let env = ProcessInfo.processInfo.environment
 
-    // Record mode: export SNAPSHOT_RECORD=1 when intentionally updating snapshots.
-    isRecording = ProcessInfo.processInfo.environment["SNAPSHOT_RECORD"] == "1"
+    let record: SnapshotTestingConfiguration.Record =
+      env["SNAPSHOT_RECORD"] == "1" ? .all :
+      (env["CI"] == "true" ? .never : .missing)
 
-    // Optional: pick your diff tool (e.g., Kaleidoscope)
-    // SnapshotTesting.diffToolCommand = { "ksdiff \($0) \($1)" }
+    // Optional: configure a diff tool (Kaleidoscope example).
+    // `SnapshotTestingConfiguration.DiffTool.ksdiff` is provided by SnapshotTesting.
+    withSnapshotTesting(record: record, diffTool: .ksdiff) {
+      super.invokeTest()
+    }
   }
 
   func testSettingsView_lightMode() {
     let view = SettingsView(model: .fixture())
       .environment(\.colorScheme, .light)
 
-    // Prefer text/hierarchy strategies for stability when possible.
-    // assertSnapshot(of: view, as: .dump) // text-based
+    // Prefer text-based strategies for stability when possible.
+    // assertSnapshot(of: view, as: .dump)
+
+    // Image snapshots are useful but environment-sensitive.
+    // Pin simulator + device config, and keep rendering deterministic.
     assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13)))
   }
 }
@@ -30,6 +44,7 @@ final class ExampleSnapshotTests: XCTestCase {
 private struct SettingsView: View {
   let model: Model
   var body: some View { Text("Settings") }
+
   struct Model {
     static func fixture() -> Self { .init() }
   }
