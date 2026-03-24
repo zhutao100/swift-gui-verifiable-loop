@@ -10,6 +10,18 @@ This file is intentionally more detailed than `SKILL.md`. Keep `SKILL.md` short 
 4. **XCUITest should be small + semantic**, and strengthened with accessibility identifiers, accessibility audits, and attachments.
 5. **Deterministic entry harnesses** (launch args/env/URLs) are key to removing flakiness and shortening UI paths.
 
+## Platform scope (avoid ambiguity)
+
+This skill supports **both** macOS and iOS GUI verification loops.
+
+- **macOS:** targets macOS 15 and macOS 26 (year-based numbering).
+- **iOS:** targets iOS 18 and iOS 26 (year-based numbering).
+
+Most mechanics are shared (`xcodebuild`, `.xcresult`, snapshots), but some details differ:
+
+- macOS UI interaction often uses mouse/keyboard actions (for example, `click()`), and may require Accessibility permissions for UI automation.
+- iOS UI interaction uses touch gestures (for example, `tap()`), and simulator determinism often benefits from `simctl` helpers.
+
 ## Recommended layering (gates)
 
 - Gate A (fast): `swift test` / unit tests / state-machine tests (Swift Testing or XCTest)
@@ -67,7 +79,7 @@ If a UI smoke test flakes:
 - Prefer modern `xcresulttool get test-results ...` subcommands.
 - Prefer deterministic test execution settings for UI/snapshot runs:
   - `-parallel-testing-enabled NO` (disable parallel test runners)
-  - stable `-destination` (UDID preferred) and stable simulator/runtime
+  - stable `-destination` (for macOS, `platform=macOS` is typically sufficient; optionally include `arch=arm64` / `arch=x86_64`)
 - Avoid relying on `xcresulttool merge` without validating your pinned Xcode version.
 
 ## Optional (advanced): internal state snapshots

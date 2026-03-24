@@ -1,0 +1,10 @@
+interface:
+  display_name: "Update swift-gui-verifiable-loop skill"
+  short_description: "Repo-internal maintainer skill for refreshing docs/templates/scripts with web-verified correctness."
+  icon_small: ""
+  icon_large: ""
+  brand_color: "#0F172A"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools: []

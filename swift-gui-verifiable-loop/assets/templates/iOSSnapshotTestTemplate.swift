@@ -2,17 +2,14 @@ import SnapshotTesting
 import SwiftUI
 import XCTest
 
-// macOS example: snapshot a SwiftUI view in stable states.
+// iOS example: snapshot a SwiftUI view in stable states.
 //
-// Recording policy:
-// - Local: allow recording missing snapshots (SnapshotTesting default) and re-record explicitly.
-// - CI: never record (missing snapshots should fail deterministically).
-//
-// To intentionally re-record snapshots locally:
-//   SNAPSHOT_RECORD=1 xcodebuild ... test
+// Recommended policy:
+// - CI: record: .never
+// - Local: record missing by default, and re-record explicitly via SNAPSHOT_RECORD=1
 
 @MainActor
-final class ExampleSnapshotTests: XCTestCase {
+final class ExampleiOSSnapshotTests: XCTestCase {
 
   override func invokeTest() {
     let env = ProcessInfo.processInfo.environment
@@ -21,8 +18,6 @@ final class ExampleSnapshotTests: XCTestCase {
       env["SNAPSHOT_RECORD"] == "1" ? .all :
       (env["CI"] == "true" ? .never : .missing)
 
-    // Optional: configure a diff tool (Kaleidoscope example).
-    // `SnapshotTestingConfiguration.DiffTool.ksdiff` is provided by SnapshotTesting.
     withSnapshotTesting(record: record, diffTool: .ksdiff) {
       super.invokeTest()
     }
@@ -35,9 +30,9 @@ final class ExampleSnapshotTests: XCTestCase {
     // Prefer text-based strategies for stability when possible.
     // assertSnapshot(of: view, as: .dump)
 
-    // Image snapshots are useful but environment-sensitive.
-    // macOS: pin toolchain and use explicit fixed sizes for deterministic baselines.
-    assertSnapshot(of: view, as: .image(layout: .fixed(width: 800, height: 600)))
+    // iOS: using a device preset provides a familiar baseline.
+    // Pin the simulator runtime + device model in your test plan configuration.
+    assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13)))
   }
 }
 

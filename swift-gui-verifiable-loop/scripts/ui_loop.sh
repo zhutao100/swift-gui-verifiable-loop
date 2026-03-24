@@ -40,10 +40,13 @@ Optional:
 
 Examples:
   scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
-    --destination 'platform=iOS Simulator,name=iPhone 16'
+    --destination 'platform=macOS'
 
   scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
-    --destination 'platform=iOS Simulator,name=iPhone 16' --reuse-build
+    --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
+
+  scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+    --destination 'platform=macOS' --reuse-build
 EOF
 }
 
