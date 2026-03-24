@@ -3,6 +3,9 @@
 # Compatible with macOS / bash 3.2+
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -30,6 +33,9 @@ Optional:
   --reuse-build                   Run build-for-testing then test-without-building (faster reruns)
   --xctestrun <path>              Use existing .xctestrun (implies test-without-building; cannot use --workspace/--project)
   --only-failures-attachments     Export only failing attachments
+  --parallel-testing-enabled <YES|NO>  Force parallel test execution on/off (default: NO)
+  --maximum-parallel-testing-workers <n>  Limit spawned test runners when parallel is enabled
+  --parallel-testing-worker-count <n>    Spawn exactly n test runners when parallel is enabled
   --run-id <id>                   Override run id
 
 Examples:
@@ -54,6 +60,10 @@ XCTESTRUN=""
 ONLY_FAIL_ATTACH=0
 RUN_ID=""
 
+PARALLEL_TESTING_ENABLED="NO"
+MAX_PARALLEL_WORKERS=""
+PARALLEL_WORKER_COUNT=""
+
 ONLY_TESTING=()
 SKIP_TESTING=()
 ONLY_TEST_CONFIG=()
@@ -76,11 +86,19 @@ while [[ $# -gt 0 ]]; do
     --reuse-build) REUSE_BUILD=1; shift 1;;
     --xctestrun) XCTESTRUN="$2"; shift 2;;
     --only-failures-attachments) ONLY_FAIL_ATTACH=1; shift 1;;
+    --parallel-testing-enabled) PARALLEL_TESTING_ENABLED="$2"; shift 2;;
+    --maximum-parallel-testing-workers) MAX_PARALLEL_WORKERS="$2"; shift 2;;
+    --parallel-testing-worker-count) PARALLEL_WORKER_COUNT="$2"; shift 2;;
     --run-id) RUN_ID="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2;;
   esac
 done
+
+case "$PARALLEL_TESTING_ENABLED" in
+  YES|NO) ;;
+  *) echo "--parallel-testing-enabled must be YES or NO (got: $PARALLEL_TESTING_ENABLED)" >&2; exit 2;;
+esac
 
 if [[ -z "$SCHEME" ]]; then
   echo "Missing --scheme" >&2
@@ -116,7 +134,7 @@ RESULT_BUNDLE="$RUN_DIR/results.xcresult"
 SUMMARY_JSON="$RUN_DIR/summary.json"
 TOOLCHAIN_TXT="$RUN_DIR/toolchain.txt"
 
-scripts/toolchain_fingerprint.sh > "$TOOLCHAIN_TXT"
+"$SCRIPT_DIR/toolchain_fingerprint.sh" > "$TOOLCHAIN_TXT"
 
 # Helper to append repeatable args:
 append_repeatable() {
@@ -152,6 +170,15 @@ run_xcodebuild_test() {
   for item in "${SKIP_TEST_CONFIG[@]}"; do cmd+=("-skip-test-configuration" "$item"); done
 
   cmd+=("-resultBundlePath" "$RESULT_BUNDLE")
+
+  # Determinism defaults: disable parallel testing unless explicitly enabled.
+  cmd+=("-parallel-testing-enabled" "$PARALLEL_TESTING_ENABLED")
+  if [[ -n "$PARALLEL_WORKER_COUNT" ]]; then
+    cmd+=("-parallel-testing-worker-count" "$PARALLEL_WORKER_COUNT")
+  elif [[ -n "$MAX_PARALLEL_WORKERS" ]]; then
+    cmd+=("-maximum-parallel-testing-workers" "$MAX_PARALLEL_WORKERS")
+  fi
+
   cmd+=("$action")
 
   echo "==> Running: ${cmd[*]}" >&2
@@ -162,7 +189,14 @@ run_test_without_building() {
   local -a cmd=("xcodebuild" "-xctestrun" "$XCTESTRUN")
 
   if [[ -n "$DESTINATION" ]]; then cmd+=("-destination" "$DESTINATION"); fi
-  cmd+=("-resultBundlePath" "$RESULT_BUNDLE" "test-without-building")
+  cmd+=("-resultBundlePath" "$RESULT_BUNDLE")
+  cmd+=("-parallel-testing-enabled" "$PARALLEL_TESTING_ENABLED")
+  if [[ -n "$PARALLEL_WORKER_COUNT" ]]; then
+    cmd+=("-parallel-testing-worker-count" "$PARALLEL_WORKER_COUNT")
+  elif [[ -n "$MAX_PARALLEL_WORKERS" ]]; then
+    cmd+=("-maximum-parallel-testing-workers" "$MAX_PARALLEL_WORKERS")
+  fi
+  cmd+=("test-without-building")
 
   echo "==> Running: ${cmd[*]}" >&2
   "${cmd[@]}"
@@ -179,8 +213,33 @@ elif [[ "$REUSE_BUILD" -eq 1 ]]; then
   # (Do not rely on -testPlan being honored by test-without-building.)
   run_xcodebuild_test "build-for-testing"
 
-  # Find newest xctestrun under derived data
-  XCTESTRUN="$(find "$DERIVED_DATA" -name '*.xctestrun' -print0 | xargs -0 ls -t 2>/dev/null | head -n 1 || true)"
+  # Find newest xctestrun under derived data (portable across macOS/Linux stat variants).
+  mtime_of() {
+    local p="$1"
+    if stat -f %m "$p" >/dev/null 2>&1; then
+      stat -f %m "$p"
+    else
+      stat -c %Y "$p"
+    fi
+  }
+
+  xctestruns=()
+  f=""
+  while IFS= read -r -d '' f; do
+    xctestruns+=("$f")
+  done < <(find "$DERIVED_DATA" -name '*.xctestrun' -print0 2>/dev/null || true)
+
+  newest=""
+  newest_m=0
+  m=""
+  for f in "${xctestruns[@]}"; do
+    m="$(mtime_of "$f" || echo 0)"
+    if [[ -z "$newest" || "$m" -gt "$newest_m" ]]; then
+      newest="$f"
+      newest_m="$m"
+    fi
+  done
+  XCTESTRUN="$newest"
   if [[ -z "$XCTESTRUN" ]]; then
     echo "Could not locate .xctestrun under derived data: $DERIVED_DATA" >&2
     exit 3
@@ -191,13 +250,13 @@ else
   run_xcodebuild_test "test"
 fi
 
-scripts/xcresult_summary.sh "$RESULT_BUNDLE" "$SUMMARY_JSON"
+"$SCRIPT_DIR/xcresult_summary.sh" "$RESULT_BUNDLE" "$SUMMARY_JSON"
 
 EXPORT_ARGS=()
 if [[ "$ONLY_FAIL_ATTACH" -eq 1 ]]; then
   EXPORT_ARGS+=("--only-failures")
 fi
-scripts/xcresult_export.sh "$RESULT_BUNDLE" "$RUN_DIR" "${EXPORT_ARGS[@]}"
+"$SCRIPT_DIR/xcresult_export.sh" "$RESULT_BUNDLE" "$RUN_DIR" "${EXPORT_ARGS[@]}"
 
 echo "==> Done."
 echo "Run dir: $RUN_DIR"

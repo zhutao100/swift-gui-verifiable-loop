@@ -1,6 +1,6 @@
 # SnapshotTesting (Point-Free) quick reference
 
-Upstream docs: `pointfreeco/swift-snapshot-testing`
+Upstream: `pointfreeco/swift-snapshot-testing` (latest release is frequently updated; as of March 2026 it is 1.19.1).
 
 ## SwiftPM setup (from upstream README)
 
@@ -10,7 +10,7 @@ Add package dependency:
 dependencies: [
   .package(
     url: "https://github.com/pointfreeco/swift-snapshot-testing",
-    from: "1.12.0"
+    from: "1.12.0" // use the latest compatible version for your project
   ),
 ]
 ```
@@ -27,7 +27,22 @@ Add the SnapshotTesting product to your *test* target:
 )
 ```
 
-## Basic usage
+## Basic usage (Swift Testing)
+
+```swift
+import SnapshotTesting
+import Testing
+
+@MainActor
+struct MySnapshots {
+  @Test func user_json() {
+    let user = User(id: 1, name: "Blobby", bio: "Blobbed around the world.")
+    assertSnapshot(of: user, as: .json)
+  }
+}
+```
+
+## Basic usage (XCTest)
 
 ```swift
 import SnapshotTesting
@@ -41,22 +56,49 @@ final class UserSnapshotTests: XCTestCase {
 }
 ```
 
+## Snapshot strategies you will use most
+
+- `.image` (visual regression)
+- `.recursiveDescription` (text, view hierarchy)
+- `.dump` / `.json` / `.plist` (text, stable and agent-readable)
+
 ## Recording / updating snapshots (policy)
 
-- Recording is a deliberate action. Typical pattern:
+SnapshotTesting deprecated the global `isRecording` flag in favor of scoped configuration.
+
+- **CI should be strict**: use `record: .never` so missing snapshots fail (rather than being generated during a retry).
+- **Local baseline work should be explicit**: set `SNAPSHOT_RECORD=1` and run tests to re-record.
+
+Typical XCTest pattern (wrap `invokeTest`):
 
 ```swift
 import SnapshotTesting
+import XCTest
 
-final class MySnapshots: XCTestCase {
-  override func setUp() {
-    super.setUp()
-    // Set this to true only while intentionally updating snapshots.
-    isRecording = false
+final class FeatureSnapshots: XCTestCase {
+  override func invokeTest() {
+    let env = ProcessInfo.processInfo.environment
+    let record: SnapshotTestingConfiguration.Record =
+      env["SNAPSHOT_RECORD"] == "1" ? .all :
+      (env["CI"] == "true" ? .never : .missing)
+
+    withSnapshotTesting(record: record, diffTool: .ksdiff) {
+      super.invokeTest()
+    }
   }
 }
 ```
 
-Recommended: gate recording behind an env var (e.g., `SNAPSHOT_RECORD=1`) so agents cannot accidentally update baselines in CI.
+Swift Testing pattern (suite trait):
+
+```swift
+import SnapshotTesting
+import Testing
+
+@Suite(.snapshots(record: .failed, diffTool: .ksdiff))
+struct FeatureSnapshots {
+  // ...
+}
+```
 
 Template: `assets/templates/SnapshotTestTemplate.swift`

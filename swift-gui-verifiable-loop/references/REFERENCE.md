@@ -65,6 +65,19 @@ If a UI smoke test flakes:
 
 - Always record toolchain fingerprint (Xcode version churn affects parsing).
 - Prefer modern `xcresulttool get test-results ...` subcommands.
+- Prefer deterministic test execution settings for UI/snapshot runs:
+  - `-parallel-testing-enabled NO` (disable parallel test runners)
+  - stable `-destination` (UDID preferred) and stable simulator/runtime
 - Avoid relying on `xcresulttool merge` without validating your pinned Xcode version.
+
+## Optional (advanced): internal state snapshots
+
+For features that are hard to validate visually, a high-ROI pattern is a debug-only “state export” hook:
+
+- app launched in test mode (launch args/env/URL)
+- app writes a JSON state snapshot to a known location (or serves it on localhost)
+- UI test attaches that JSON via `XCTAttachment`
+
+This converts “GUI correctness” into an agent-readable, deterministic artifact.
 
 See `references/xcresult-bundles.md`.
