@@ -1,6 +1,6 @@
 interface:
   display_name: "Swift GUI Verifiable Loop"
-  short_description: "Deterministic SwiftUI/AppKit closed-loop harness (xcodebuild + xcresulttool + snapshots + accessibility audits)."
+  short_description: "Deterministic SwiftUI GUI closed-loop harness for macOS (AppKit) and iOS (UIKit): xcodebuild + xcresulttool + snapshots + accessibility audits."
   icon_small: ""
   icon_large: ""
   brand_color: "#0F172A"

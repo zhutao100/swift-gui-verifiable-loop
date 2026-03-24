@@ -20,7 +20,7 @@ final class ContentViewTests: XCTestCase {
 
 ## Notes
 
-- The Swift 6 compiler may insert implicit `AnyView`s; `implicitAnyView()` helps unwrap.
+- With Swift 6 (Xcode 16+), the compiler may insert implicit `AnyView`s; `implicitAnyView()` helps unwrap.
 - Treat this as a tactical tool (reflection can be sensitive to framework/compiler changes).
 
 Template: `assets/templates/ViewInspectorTemplate.swift`

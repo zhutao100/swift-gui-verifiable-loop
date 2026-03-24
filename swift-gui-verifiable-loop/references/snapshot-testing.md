@@ -1,21 +1,24 @@
-# SnapshotTesting (Point-Free) quick reference
+# SnapshotTesting (Point-Free) quick reference (macOS + iOS)
 
-Upstream: `pointfreeco/swift-snapshot-testing` (latest release is frequently updated; as of March 2026 it is 1.19.1).
+Upstream:
+
+- Repository: `pointfreeco/swift-snapshot-testing`
+- Releases: check the upstream releases page for the current version. (At the time this skill was last refreshed, the latest tagged release was `1.19.1`.)
 
 ## SwiftPM setup (from upstream README)
 
-Add package dependency:
+Add a package dependency:
 
 ```swift
 dependencies: [
   .package(
     url: "https://github.com/pointfreeco/swift-snapshot-testing",
-    from: "1.12.0" // use the latest compatible version for your project
+    from: "1.19.1" // use the latest compatible version for your project
   ),
 ]
 ```
 
-Add the SnapshotTesting product to your *test* target:
+Add the product to your *test* target:
 
 ```swift
 .testTarget(
@@ -27,46 +30,33 @@ Add the SnapshotTesting product to your *test* target:
 )
 ```
 
-## Basic usage (Swift Testing)
-
-```swift
-import SnapshotTesting
-import Testing
-
-@MainActor
-struct MySnapshots {
-  @Test func user_json() {
-    let user = User(id: 1, name: "Blobby", bio: "Blobbed around the world.")
-    assertSnapshot(of: user, as: .json)
-  }
-}
-```
-
-## Basic usage (XCTest)
-
-```swift
-import SnapshotTesting
-import XCTest
-
-final class UserSnapshotTests: XCTestCase {
-  func testUser_json() {
-    let user = User(id: 1, name: "Blobby", bio: "Blobbed around the world.")
-    assertSnapshot(of: user, as: .json)
-  }
-}
-```
-
 ## Snapshot strategies you will use most
 
 - `.image` (visual regression)
-- `.recursiveDescription` (text, view hierarchy)
-- `.dump` / `.json` / `.plist` (text, stable and agent-readable)
+- `.recursiveDescription` / `.dump` (text, view hierarchy)
+- `.json` / `.plist` (text, stable and agent-readable)
+
+## Platform guidance
+
+### macOS
+
+Prefer explicit layouts (fixed sizes) over device presets.
+
+- Use `.image(layout: .fixed(width:height:))` for stable, deterministic baselines.
+- Use `.image(layout: .sizeThatFits)` for small views that have well-defined intrinsic content sizes.
+
+### iOS (simulator)
+
+Device presets are convenient, but they only become deterministic when you **pin the simulator runtime + device model**.
+
+- Use `.image(layout: .device(config: ...))`.
+- In CI and agentic workflows, prefer an explicit `-destination` (often including `OS=`) and consider using a simulator UDID for repeatability.
 
 ## Recording / updating snapshots (policy)
 
 SnapshotTesting deprecated the global `isRecording` flag in favor of scoped configuration.
 
-- **CI should be strict**: use `record: .never` so missing snapshots fail (rather than being generated during a retry).
+- **CI should be strict**: use `record: .never` so missing snapshots fail deterministically.
 - **Local baseline work should be explicit**: set `SNAPSHOT_RECORD=1` and run tests to re-record.
 
 Typical XCTest pattern (wrap `invokeTest`):
@@ -75,9 +65,11 @@ Typical XCTest pattern (wrap `invokeTest`):
 import SnapshotTesting
 import XCTest
 
+@MainActor
 final class FeatureSnapshots: XCTestCase {
   override func invokeTest() {
     let env = ProcessInfo.processInfo.environment
+
     let record: SnapshotTestingConfiguration.Record =
       env["SNAPSHOT_RECORD"] == "1" ? .all :
       (env["CI"] == "true" ? .never : .missing)
@@ -86,7 +78,35 @@ final class FeatureSnapshots: XCTestCase {
       super.invokeTest()
     }
   }
+
+  func testSettingsView_lightMode() {
+    let view = SettingsView(model: .fixture())
+      .environment(\.colorScheme, .light)
+
+    // Prefer text-based strategies for stability when possible.
+    // assertSnapshot(of: view, as: .dump)
+
+    // macOS: prefer fixed sizes for deterministic image baselines.
+    assertSnapshot(of: view, as: .image(layout: .fixed(width: 800, height: 600)))
+  }
 }
+
+private struct SettingsView: SwiftUI.View {
+  let model: Model
+  var body: some SwiftUI.View { SwiftUI.Text("Settings") }
+
+  struct Model {
+    static func fixture() -> Self { .init() }
+  }
+}
+
+## iOS example
+
+For iOS snapshots, a device preset is often the most ergonomic baseline:
+
+```swift
+assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13)))
+```
 ```
 
 Swift Testing pattern (suite trait):
@@ -100,5 +120,3 @@ struct FeatureSnapshots {
   // ...
 }
 ```
-
-Template: `assets/templates/SnapshotTestTemplate.swift`

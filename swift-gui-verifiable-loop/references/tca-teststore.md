@@ -9,6 +9,15 @@ let store = TestStore(initialState: App.State()) {
   App()
 }
 
+// Optionally override dependencies to make effects deterministic.
+// (For example: UUID, Date, Clock, and any API clients.)
+//
+// let store = TestStore(initialState: App.State()) {
+//   App()
+// } withDependencies: {
+//   $0.uuid = .incrementing
+// }
+
 await store.send(\.login.submitButtonTapped) {
   $0.login?.isLoading = true
   // ...

@@ -1,8 +1,13 @@
 import XCTest
 
-// macOS example: keep UI smoke tests short and anchor on stable accessibility identifiers.
+// iOS example: keep UI smoke tests short and anchor on stable accessibility identifiers.
+//
+// Notes:
+// - Use deterministic entry harnesses (launch args/env/deep links).
+// - Prefer `.tap()` over `.click()`.
+// - For simulator determinism, consider pre-granting permissions via `xcrun simctl privacy ...`.
 
-final class SmokeFlowTests: XCTestCase {
+final class iOSSmokeFlowTests: XCTestCase {
 
   override func setUpWithError() throws {
     continueAfterFailure = false
@@ -16,26 +21,26 @@ final class SmokeFlowTests: XCTestCase {
     app.launchEnvironment["FIXTURE_SET"] = "smoke"
     app.launchEnvironment["NETWORK_MODE"] = "stubbed"
 
+    // Handle common permission alerts (location/notifications/etc.) if they appear.
+    addUIInterruptionMonitor(withDescription: "System Dialog") { alert in
+      for label in ["Allow", "Allow While Using App", "OK", "Don’t Allow"] {
+        if alert.buttons[label].exists {
+          alert.buttons[label].tap()
+          return true
+        }
+      }
+      return false
+    }
+
     app.launch()
 
-    // macOS: anchor on a stable root element early.
-    // Prefer explicit accessibility identifiers on your main window/content root.
-    let mainWindow = app.windows["main.window"]
-    XCTAssertTrue(mainWindow.waitForExistence(timeout: 5))
+    // The interruption monitor requires an interaction to trigger.
+    app.tap()
 
     // Prefer accessibility identifiers over localized text.
     let saveButton = app.buttons["settings.save"]
     XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
-    saveButton.click()
-
-    // Example: validating a menu action (common in macOS apps).
-    // (Use menu titles only if you control them and they are stable; identifiers are preferred when available.)
-    let fileMenu = app.menuBars.menuBarItems["File"]
-    if fileMenu.exists {
-      fileMenu.click()
-      let newItem = app.menuItems["New"]
-      if newItem.exists { newItem.click() }
-    }
+    saveButton.tap()
 
     // Evidence enrichment on failure:
     if !app.staticTexts["settings.savedBanner"].waitForExistence(timeout: 5) {

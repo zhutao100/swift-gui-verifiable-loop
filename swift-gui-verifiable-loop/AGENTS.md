@@ -1,6 +1,6 @@
 # AGENTS.md — Swift GUI verifiable loop
 
-This repository is a **skill** for agentic tools to maintain a **machine-verifiable closed loop** while changing SwiftUI/AppKit/UIKit GUI code.
+This repository is a **skill** for agentic tools to maintain a **machine-verifiable closed loop** while changing SwiftUI GUI code on macOS (AppKit) and iOS (UIKit).
 
 ## What “done” means for a change
 
@@ -19,23 +19,40 @@ Before iterating, collect these constants from the target project and write them
 - Workspace or project path (`.xcworkspace` or `.xcodeproj`)
 - Scheme name
 - Test plan name (recommended)
-- Destination string (prefer simulator **UDID** when possible)
+- Destination string:
+  - macOS: `platform=macOS` (optionally include `arch=arm64` / `arch=x86_64`)
+  - iOS Simulator: `platform=iOS Simulator,name=<device>,OS=<version>` (prefer a simulator UDID when you need strict repeatability)
 
 Agents must not guess these values.
 
 ## Default iteration loop
 
 1. **Make one coherent change** (keep diffs small).
-2. Run a deterministic verification pass:
+2. Run a deterministic verification pass.
+
+   macOS example:
 
    ```bash
    scripts/ui_loop.sh \
      --workspace App.xcworkspace \
      --scheme App \
      --test-plan Smoke \
-     --destination 'platform=iOS Simulator,name=iPhone 16' \
+     --destination 'platform=macOS' \
      --artifacts-dir ./artifacts
    ```
+
+   iOS Simulator example:
+
+   ```bash
+   scripts/ui_loop.sh \
+     --workspace App.xcworkspace \
+     --scheme App \
+     --test-plan Smoke \
+     --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' \
+     --artifacts-dir ./artifacts
+   ```
+
+   (For iOS 26 environments, use `OS=26.0` in the destination.)
 
 3. Inspect `artifacts/<run-id>/summary.json`.
 4. If failed, inspect exported artifacts:
@@ -54,7 +71,7 @@ scripts/ui_loop.sh \
   --workspace App.xcworkspace \
   --scheme App \
   --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16' \
+  --destination 'platform=macOS' \
   --only-testing MyAppTests/SettingsViewTests/testSettingsView_lightMode
 ```
 
@@ -70,7 +87,15 @@ Example:
 ```bash
 SNAPSHOT_RECORD=1 \
 scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16'
+  --destination 'platform=macOS'
+```
+
+iOS Simulator example:
+
+```bash
+SNAPSHOT_RECORD=1 \
+scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+  --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
 ```
 
 Rules:
@@ -89,6 +114,11 @@ UI tests are valuable but inherently fragile. Keep them:
 - **artifact-rich** (screenshots, JSON dumps, logs as attachments)
 
 See templates in `assets/templates/`.
+
+iOS simulator helpers:
+
+- `scripts/ios/simctl_prepare.sh`
+- `scripts/ios/simctl_privacy.sh`
 
 ## Determinism defaults
 
@@ -112,7 +142,7 @@ When a run fails:
    - check accessibility identifiers
    - shorten the test by adding deterministic entry harnesses
 3. If it is a snapshot failure:
-   - confirm the simulator/runtime is pinned and stable
+   - confirm the runtime is pinned and stable (Xcode version, font rendering, color space)
    - confirm fonts/dynamic type/locale are controlled
    - re-record only if the change is intended
 4. If it is a build failure:
