@@ -11,5 +11,6 @@ repos:
       - id: trailing-whitespace
       - id: check-merge-conflict
       - id: check-yaml
+      - id: check-json
       - id: check-added-large-files
         args: ["--maxkb=1024"]

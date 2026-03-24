@@ -1,19 +1,37 @@
 ---
 name: swift-gui-verifiable-loop
-description: Create and run a deterministic, agent-friendly closed loop for SwiftUI/AppKit GUI changes using xcodebuild + .xcresult evidence + xcresulttool extraction, plus snapshot testing, accessibility audits, and small XCUITest smoke flows.
+description: Create and run a deterministic, agent-friendly closed loop for SwiftUI/AppKit/UIKit GUI changes using xcodebuild + .xcresult evidence + xcresulttool extraction, plus snapshot testing, accessibility audits, and small XCUITest smoke flows.
 license: MIT
-compatibility: macOS 15+ with Xcode CLI tools (xcodebuild, xcrun/xcresulttool, simctl). Network recommended for fetching Swift packages and documentation.
+compatibility: |
+  Host (required): macOS Sequoia 15.x or macOS Tahoe 26.x with Xcode command-line tools installed (xcodebuild, xcrun, xcresulttool, simctl).
+  Target apps covered by this skill:
+    - macOS apps: target macOS 15 and macOS 26.
+    - iOS apps: target iOS 18 and iOS 26 (typically via iOS Simulator; physical devices also supported).
+  Notes:
+    - Apple adopted year-based OS version numbers starting with “26” releases (iOS 26, macOS Tahoe 26, etc). Pin Xcode accordingly.
+    - Prefer Xcode 26 for OS 26 SDKs; use the matching older Xcode (e.g., Xcode 16) when validating against iOS 18-era SDK behavior.
 metadata:
   author: generated-by-chatgpt
-  version: "1.0"
-  tags: swift swiftui appkit xcodebuild xcresult xcresulttool snapshot-testing xctest xcuittest accessibility audit agentic
+  version: "1.1"
+  tags: swift swiftui appkit uikit xcodebuild xcresult xcresulttool simctl snapshot-testing swift-testing xctest xcuittest accessibility audit agentic
 ---
 
 # Swift GUI verifiable closed-loop (agent skill)
 
+## Platform scope (macOS vs iOS)
+
+This skill is **hosted on macOS**, and supports two families of target apps:
+
+| Target | OS versions in scope | How tests run | Typical `-destination` |
+|---|---:|---|---|
+| **macOS apps (AppKit / SwiftUI)** | macOS **15** and **26** | on the current Mac | `platform=macOS` |
+| **iOS apps (UIKit / SwiftUI)** | iOS **18** and **26** | in **iOS Simulator** (recommended) or on-device | `platform=iOS Simulator,id=<UDID>` |
+
+If you are working on a Mac Catalyst target, treat it as **macOS destination** with a Catalyst variant (`platform=macOS,variant=Mac Catalyst`).
+
 ## When to use
 
-Use this skill when an agent (Codex CLI, Claude Code, Xcode agent) is implementing or refactoring **SwiftUI/AppKit/UIKit UI code** and you need a **machine-verifiable** iteration loop:
+Use this skill when an agent (Codex CLI, Claude Code, or a custom CLI-driven agent) is implementing or refactoring **SwiftUI/AppKit/UIKit UI code** and you need a **machine-verifiable** iteration loop:
 
 1) change code
 2) run deterministic checks
@@ -31,23 +49,25 @@ A reliable GUI loop is typically **hybrid**:
 - **Small GUI smoke** (outer loop): minimal XCUITest flows + accessibility audits + rich attachments.
 - **Immutable evidence store**: always keep the `.xcresult` bundle and derive summaries/attachments from it.
 
-## Inputs you must collect (one-time per project)
+## Inputs you must collect (one-time per target project)
+
+Pin these inputs in the target project’s own docs (recommended: its root `AGENTS.md`). Agents must not guess.
 
 - Workspace or project: `App.xcworkspace` or `App.xcodeproj`
 - Scheme: `App`
 - Test plan (recommended): `Smoke` (a `.xctestplan` attached to the scheme)
-- Destination:
-  - iOS Simulator: `platform=iOS Simulator,name=iPhone 16`
-  - macOS: typically `platform=macOS`
+- Destination
+  - iOS Simulator (recommended): use a **stable UDID**
+    - `platform=iOS Simulator,id=<UDID>`
+  - macOS (current machine):
+    - `platform=macOS`
 - Optional: derived data directory for repeatable runs
-
-Keep these as constants in your project docs (e.g., `AGENTS.md`) so agents never guess.
 
 ---
 
 # Step-by-step closed-loop workflow
 
-## Step 0 — Make the UI *verifiable by construction*
+## Step 0 — Make the UI verifiable by construction
 
 Do this once, then keep enforcing it.
 
@@ -67,13 +87,16 @@ Do this once, then keep enforcing it.
 
 Use the orchestrator script (recommended):
 
+### iOS example (Simulator)
+
 ```bash
-scripts/ui_loop.sh \
-  --workspace App.xcworkspace \
-  --scheme App \
-  --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16' \
-  --artifacts-dir ./artifacts
+scripts/ui_loop.sh   --workspace App.xcworkspace   --scheme App   --test-plan Smoke   --destination 'platform=iOS Simulator,id=<UDID>'   --artifacts-dir ./artifacts
+```
+
+### macOS example (current Mac)
+
+```bash
+scripts/ui_loop.sh   --workspace App.xcworkspace   --scheme App   --test-plan Smoke   --destination 'platform=macOS'   --artifacts-dir ./artifacts
 ```
 
 Outputs per run:
@@ -83,6 +106,7 @@ Outputs per run:
 - `artifacts/<run-id>/summary.json` (machine-readable test summary)
 - `artifacts/<run-id>/attachments/**` (exported screenshots/attachments)
 - `artifacts/<run-id>/diagnostics/**` (crash logs, diagnostics)
+- `artifacts/<run-id>/run_manifest.json` (stable pointers to the above artifacts)
 
 If you prefer manual commands, see `references/xcresult-bundles.md`.
 
@@ -160,7 +184,7 @@ After each code change:
 - **GUI nondeterminism** → push logic into unit tests + launch harnesses.
 - **Flaky UI queries** → stable accessibility identifiers, concise queries, small smoke flows.
 - **Hard-to-interpret failures** → `.xcresult` as evidence + exported attachments/diagnostics.
-- **Tooling churn** → record toolchain fingerprint each run; prefer structured `xcresulttool` subcommands.
+- **Tooling churn** → record toolchain fingerprint each run; prefer modern `xcresulttool get test-results …` subcommands.
 
 See `references/REFERENCE.md` for deeper troubleshooting and patterns.
 

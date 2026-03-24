@@ -258,6 +258,19 @@ if [[ "$ONLY_FAIL_ATTACH" -eq 1 ]]; then
 fi
 "$SCRIPT_DIR/xcresult_export.sh" "$RESULT_BUNDLE" "$RUN_DIR" "${EXPORT_ARGS[@]}"
 
+MANIFEST_JSON="$RUN_DIR/run_manifest.json"
+cat > "$MANIFEST_JSON" <<EOF
+{
+  "run_id": "${RUN_ID}",
+  "results_bundle": "${RESULT_BUNDLE}",
+  "summary_json": "${SUMMARY_JSON}",
+  "toolchain_fingerprint": "${TOOLCHAIN_TXT}",
+  "attachments_dir": "${RUN_DIR}/attachments",
+  "diagnostics_dir": "${RUN_DIR}/diagnostics",
+  "logs_dir": "${RUN_DIR}/logs"
+}
+EOF
+
 echo "==> Done."
 echo "Run dir: $RUN_DIR"
 echo "Result bundle: $RESULT_BUNDLE"

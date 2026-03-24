@@ -102,3 +102,9 @@ struct FeatureSnapshots {
 ```
 
 Template: `assets/templates/SnapshotTestTemplate.swift`
+
+## iOS 26 “Liquid Glass” / material effects note
+
+Some iOS 26 SwiftUI material/glass effects can snapshot as fully transparent in certain configurations. If you see this, consider isolating the view under test with an explicit background (or snapshot a text/hierarchy strategy instead of image).
+
+Source (discussion thread): https://github.com/pointfreeco/swift-snapshot-testing/discussions/1031

@@ -32,6 +32,19 @@ CONSOLE_LOG_TXT="$LOG_DIR/console.txt"
 
 mkdir -p "$ATT_DIR" "$DIAG_DIR" "$LOG_DIR"
 
+legacy_root_json() {
+  # Write best-effort root JSON to stdout.
+  if xcrun xcresulttool get object --help >/dev/null 2>&1; then
+    if xcrun xcresulttool get object --help 2>/dev/null | grep -q -- '--legacy'; then
+      xcrun xcresulttool get object --legacy --path "$BUNDLE" --format json
+    else
+      xcrun xcresulttool get object --path "$BUNDLE" --format json
+    fi
+  else
+    xcrun xcresulttool get --path "$BUNDLE" --format json
+  fi
+}
+
 # Best-effort exports (do not fail the overall run if these change across Xcode versions).
 xcrun xcresulttool metadata get --path "$BUNDLE" > "$META_JSON" || true
 
@@ -43,9 +56,9 @@ if xcrun xcresulttool get test-results summary --help >/dev/null 2>&1; then
   xcrun xcresulttool get log --path "$BUNDLE" --type action --compact > "$ACTION_LOG_TXT" || true
   xcrun xcresulttool get log --path "$BUNDLE" --type console --compact > "$CONSOLE_LOG_TXT" || true
 else
-  # Older Xcodes: fall back to legacy JSON root.
-  xcrun xcresulttool get --path "$BUNDLE" --format json > "$SUMMARY_JSON" || true
-  xcrun xcresulttool get --path "$BUNDLE" --format json > "$TESTS_JSON" || true
+  # Older Xcodes: fall back to legacy root object JSON.
+  legacy_root_json > "$SUMMARY_JSON" || true
+  legacy_root_json > "$TESTS_JSON" || true
 fi
 
 if [[ "$ONLY_FAILURES" -eq 1 ]]; then

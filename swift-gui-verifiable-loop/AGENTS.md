@@ -2,6 +2,15 @@
 
 This repository is a **skill** for agentic tools to maintain a **machine-verifiable closed loop** while changing SwiftUI/AppKit/UIKit GUI code.
 
+## Platform scope (macOS vs iOS)
+
+- **Host environment:** macOS Sequoia 15.x or macOS Tahoe 26.x with Xcode command-line tools.
+- **Target apps in scope:**
+  - **macOS apps:** target macOS **15** and **26** (run tests on the current Mac with `platform=macOS`).
+  - **iOS apps:** target iOS **18** and **26** (typically run tests in iOS Simulator with a pinned UDID).
+
+Important: Apple adopted **year-based OS version numbers** starting with “26” releases (iOS 26, macOS Tahoe 26, etc). Pin Xcode to match the SDK you are validating against.
+
 ## What “done” means for a change
 
 For any GUI-related change, the agent should be able to produce **immutable evidence**:
@@ -9,6 +18,7 @@ For any GUI-related change, the agent should be able to produce **immutable evid
 - a fresh `.xcresult` bundle
 - a machine-readable summary derived from the bundle
 - exported attachments/diagnostics/logs when present
+- a `run_manifest.json` file pointing at the artifacts for the run
 
 Do not rely on manual screenshots, Preview eyeballing, or subjective descriptions as proof.
 
@@ -19,43 +29,32 @@ Before iterating, collect these constants from the target project and write them
 - Workspace or project path (`.xcworkspace` or `.xcodeproj`)
 - Scheme name
 - Test plan name (recommended)
-- Destination string (prefer simulator **UDID** when possible)
+- Destination string
+  - iOS Simulator: prefer simulator **UDID** (`platform=iOS Simulator,id=<UDID>`)
+  - macOS: `platform=macOS`
 
 Agents must not guess these values.
 
 ## Default iteration loop
 
-1. **Make one coherent change** (keep diffs small).
-2. Run a deterministic verification pass:
+### iOS (Simulator)
 
-   ```bash
-   scripts/ui_loop.sh \
-     --workspace App.xcworkspace \
-     --scheme App \
-     --test-plan Smoke \
-     --destination 'platform=iOS Simulator,name=iPhone 16' \
-     --artifacts-dir ./artifacts
-   ```
+```bash
+scripts/ui_loop.sh   --workspace App.xcworkspace   --scheme App   --test-plan Smoke   --destination 'platform=iOS Simulator,id=<UDID>'   --artifacts-dir ./artifacts
+```
 
-3. Inspect `artifacts/<run-id>/summary.json`.
-4. If failed, inspect exported artifacts:
-   - `artifacts/<run-id>/attachments/**`
-   - `artifacts/<run-id>/diagnostics/**`
-   - `artifacts/<run-id>/logs/**`
-   - `artifacts/<run-id>/toolchain.txt`
-5. Make the next fix based strictly on evidence.
+### macOS (current Mac)
+
+```bash
+scripts/ui_loop.sh   --workspace App.xcworkspace   --scheme App   --test-plan Smoke   --destination 'platform=macOS'   --artifacts-dir ./artifacts
+```
 
 ## Fast inner loop (target one test)
 
 When you know the affected test(s), run just that subset:
 
 ```bash
-scripts/ui_loop.sh \
-  --workspace App.xcworkspace \
-  --scheme App \
-  --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16' \
-  --only-testing MyAppTests/SettingsViewTests/testSettingsView_lightMode
+scripts/ui_loop.sh   --workspace App.xcworkspace   --scheme App   --test-plan Smoke   --destination 'platform=iOS Simulator,id=<UDID>'   --only-testing MyAppTests/SettingsViewTests/testSettingsView_lightMode
 ```
 
 ## Snapshot workflow rules
@@ -68,9 +67,7 @@ Snapshot tests are a primary GUI verifier, but recording must be intentional.
 Example:
 
 ```bash
-SNAPSHOT_RECORD=1 \
-scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16'
+SNAPSHOT_RECORD=1 scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke   --destination 'platform=iOS Simulator,id=<UDID>'
 ```
 
 Rules:
@@ -106,7 +103,7 @@ scripts/ui_loop.sh ... --parallel-testing-enabled YES --maximum-parallel-testing
 
 When a run fails:
 
-1. Open `summary.json` to identify the failing target/test.
+1. Open `summary.json` (or `xcresult_summary.json`) to identify the failing target/test.
 2. If it is a UI test failure:
    - inspect attachments (screenshots/videos when present)
    - check accessibility identifiers
@@ -122,5 +119,6 @@ When a run fails:
 
 - `SKILL.md` — the contract and step-by-step workflow
 - `references/REFERENCE.md` — design principles and troubleshooting
+- `references/platform-compatibility.md` — macOS vs iOS nuances + versioning notes
 - `references/snapshot-testing.md` — SnapshotTesting setup + recording policy
 - `references/xcresult-bundles.md` — `.xcresult` mechanics and extraction commands

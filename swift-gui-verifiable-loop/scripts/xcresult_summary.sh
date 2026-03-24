@@ -17,11 +17,20 @@ fi
 
 mkdir -p "$(dirname "$OUT")"
 
-# Prefer the structured subcommand for stability (Xcode 16+).
-# Fall back to legacy "get --format json" when running on older Xcodes.
+# Prefer the structured subcommand for stability (Xcode 16+; still present in Xcode 26).
+# Fall back to legacy "root object" JSON when running on older Xcodes.
 if xcrun xcresulttool get test-results summary --help >/dev/null 2>&1; then
   xcrun xcresulttool get test-results summary --path "$BUNDLE" --compact > "$OUT"
 else
-  # Legacy output is large, but still machine-parseable JSON.
-  xcrun xcresulttool get --path "$BUNDLE" --format json > "$OUT"
+  # Legacy mode: retrieve the root object as JSON.
+  # Newer Xcodes require `get object --legacy` for the root object.
+  if xcrun xcresulttool get object --help >/dev/null 2>&1; then
+    if xcrun xcresulttool get object --help 2>/dev/null | grep -q -- '--legacy'; then
+      xcrun xcresulttool get object --legacy --path "$BUNDLE" --format json > "$OUT"
+    else
+      xcrun xcresulttool get object --path "$BUNDLE" --format json > "$OUT"
+    fi
+  else
+    xcrun xcresulttool get --path "$BUNDLE" --format json > "$OUT"
+  fi
 fi
