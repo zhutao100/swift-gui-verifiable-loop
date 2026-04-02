@@ -1,0 +1,8 @@
+# Local artifacts (do not commit)
+.artifacts/
+artifacts/
+DerivedData/
+*.xcresult/
+
+# macOS
+.DS_Store

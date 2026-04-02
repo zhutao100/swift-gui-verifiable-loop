@@ -1,24 +1,44 @@
-# macOS UI testing permissions (Accessibility / Automation)
+# macOS UI testing permissions (Accessibility / Automation / Developer Tools)
 
 macOS UI tests (targeting macOS 15 and macOS 26) often require OS-level permissions so the test runner can drive the app like a user.
 
-## What you will see on a fresh machine
+In newer macOS releases, UI test runners can also fail to launch due to Gatekeeper/syspolicyd decisions. Treat the `.xcresult` bundle as the source of truth for what happened.
 
-When you first run a macOS UI test suite, macOS may show permission prompts (for example, asking to allow control/automation or to allow accessibility access for the test runner tooling).
+## Common prompts / toggles on a fresh machine
 
-Apple’s UI automation guidance explicitly calls out enabling the helper used by Xcode UI testing in **Privacy & Security → Accessibility**.
+If you run `xcodebuild test` / UI tests for the first time, macOS may show permission prompts.
 
-## Practical policy for agentic development loops
+Common settings involved:
 
-### Local development machine
+- **System Settings → Privacy & Security → Accessibility** (UI automation helper / Xcode / your test launcher)
+- **System Settings → Privacy & Security → Automation** (Terminal/Xcode controlling other apps)
+- **System Settings → Privacy & Security → Developer Tools** (enable the terminal app you use to run `xcodebuild`, e.g. Terminal)
 
-- Run a small “hello world” UI test once.
-- When prompted, grant the requested permissions.
-- Re-run the same test to confirm the prompt is cleared.
+## Gatekeeper / syspolicyd symptoms (macOS 15+)
 
-### CI environments
+You may see UI test failures like:
 
-Headless CI runners generally cannot click these permission prompts.
+- “Early unexpected exit… Test crashed with signal kill before establishing connection.”
+- dialogs like “app is damaged” (runner blocked before it can attach)
+
+Practical policy:
+
+1. Keep the `.xcresult` bundle.
+2. Export attachments/diagnostics (`scripts/ui/xcresult_export.sh`) and inspect them.
+3. If you need deeper OS evidence, capture a `syspolicyd` log slice around the run window.
+
+Do not rely on `spctl --assess` as the only oracle in this workflow; it can be noisy for Xcode-built products and UI test runners.
+
+## Mitigations (prefer the least invasive)
+
+- Prefer `build-for-testing` + `test-without-building` runs (see `references/xcresult-bundles.md`).
+- If you hit runner launch issues, try placing DerivedData under `/tmp` for the UI loop (example: `--reuse-build --derived-data /tmp/ui-loop/DerivedData`).
+- If the runner is still blocked and you are okay with a signing override, try `scripts/ui/ui_loop.sh --adhoc-signing` (adds `CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`).
+- Avoid disabling signing entirely (for example `CODE_SIGNING_ALLOWED=NO`); it can break UI runner integrity.
+
+## CI environments
+
+Headless CI runners generally cannot click permission prompts.
 
 Practical options:
 

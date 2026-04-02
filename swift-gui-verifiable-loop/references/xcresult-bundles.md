@@ -16,7 +16,7 @@ This skill keeps the bundle and derives:
 
 ## xcodebuild flags (key ones)
 
-- `-resultBundlePath <path>`: writes the `.xcresult` bundle (keep each run’s bundle path unique and immutable).
+- `-resultBundlePath <path>`: writes the `.xcresult` bundle. Keep each run’s bundle path unique and immutable, and ensure the path does not already exist (otherwise `xcodebuild` errors with “Existing file at -resultBundlePath …”).
 - `-testPlan <name>`: selects a test plan attached to the scheme.
 - `-only-test-configuration <name>` / `-skip-test-configuration <name>`: selects test plan configurations.
 - `-only-testing <id>` / `-skip-testing <id>`: narrows to a specific target/class/method.
@@ -24,29 +24,41 @@ This skill keeps the bundle and derives:
 
 ## Recommended command shapes
 
+Tip: if you have it, prefer `scripts/ui/ui_loop.sh` for an evidence-first run. The commands below are the underlying primitives.
+
 ### macOS
 
 ```bash
+RUN_ID="$(date -u +"%Y%m%dT%H%M%SZ")"
+RUN_DIR="./.artifacts/ui/$RUN_ID"
+RESULT_BUNDLE="$RUN_DIR/results.xcresult"
+mkdir -p "$RUN_DIR"
+
 xcodebuild \
   -workspace App.xcworkspace \
   -scheme App \
   -testPlan Smoke \
   -destination 'platform=macOS' \
   -parallel-testing-enabled NO \
-  -resultBundlePath ./artifacts/TestResults.xcresult \
+  -resultBundlePath "$RESULT_BUNDLE" \
   test
 ```
 
 ### iOS (simulator)
 
 ```bash
+RUN_ID="$(date -u +"%Y%m%dT%H%M%SZ")"
+RUN_DIR="./.artifacts/ui/$RUN_ID"
+RESULT_BUNDLE="$RUN_DIR/results.xcresult"
+mkdir -p "$RUN_DIR"
+
 xcodebuild \
   -workspace App.xcworkspace \
   -scheme App \
   -testPlan Smoke \
   -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' \
   -parallel-testing-enabled NO \
-  -resultBundlePath ./artifacts/TestResults.xcresult \
+  -resultBundlePath "$RESULT_BUNDLE" \
   test
 ```
 
@@ -69,24 +81,34 @@ Tips:
 When iterating quickly, prefer `build-for-testing` + `test-without-building`:
 
 ```bash
+RUN_ID="$(date -u +"%Y%m%dT%H%M%SZ")"
+RUN_DIR="./.artifacts/ui/$RUN_ID"
+DERIVED_DATA="$RUN_DIR/DerivedData"
+RESULT_BUNDLE="$RUN_DIR/results.xcresult"
+mkdir -p "$RUN_DIR"
+
 # 1) Build once
 xcodebuild \
   -workspace App.xcworkspace \
   -scheme App \
   -testPlan Smoke \
   -destination 'platform=macOS' \
-  -derivedDataPath ./artifacts/DerivedData \
+  -derivedDataPath "$DERIVED_DATA" \
   -parallel-testing-enabled NO \
   build-for-testing
 
 # 2) Run tests repeatedly using the generated .xctestrun
-XCTESTRUN="$(find ./artifacts/DerivedData -name '*.xctestrun' -print | head -n 1)"
+XCTESTRUN="$(
+  find "$DERIVED_DATA" -name '*.xctestrun' -print0 2>/dev/null \
+    | xargs -0 ls -t 2>/dev/null \
+    | head -n 1
+)"
 
 xcodebuild \
   -xctestrun "$XCTESTRUN" \
   -destination 'platform=macOS' \
   -parallel-testing-enabled NO \
-  -resultBundlePath ./artifacts/TestResults.xcresult \
+  -resultBundlePath "$RESULT_BUNDLE" \
   test-without-building
 ```
 
@@ -125,8 +147,8 @@ Note: In Xcode 16, Apple introduced structured `xcresulttool` commands under `ge
 
 Scripts:
 
-- `scripts/xcresult_summary.sh`
-- `scripts/xcresult_export.sh`
+- `scripts/ui/xcresult_summary.sh`
+- `scripts/ui/xcresult_export.sh`
 
 iOS simulator helpers:
 

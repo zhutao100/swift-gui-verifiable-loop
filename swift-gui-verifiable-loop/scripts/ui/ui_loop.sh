@@ -1,15 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # swift-gui-verifiable-loop: end-to-end deterministic GUI verification run
-# Compatible with macOS / bash 3.2+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/ui_loop.sh (--workspace <path> | --project <path>) --scheme <name> [options]
+  scripts/ui/ui_loop.sh (--workspace <path> | --project <path>) --scheme <name> [options]
 
 Required:
   --scheme <name>                 Xcode scheme name
@@ -21,10 +20,10 @@ One of:
 Recommended:
   --test-plan <name>              .xctestplan name (without extension)
   --destination <string>          xcodebuild -destination string
-  --artifacts-dir <dir>           Output root (default: ./artifacts)
+  --artifacts-dir <dir>           Output root (default: ./.artifacts/ui)
 
 Optional:
-  --derived-data <dir>            DerivedData path (default: artifacts/<run-id>/DerivedData when --reuse-build)
+  --derived-data <dir>            DerivedData path (default: <run-dir>/DerivedData when --reuse-build)
   --configuration <name>          e.g. Debug / Release
   --only-testing <id>             Repeatable. TestTarget[/TestClass[/TestMethod]]
   --skip-testing <id>             Repeatable.
@@ -36,17 +35,18 @@ Optional:
   --parallel-testing-enabled <YES|NO>  Force parallel test execution on/off (default: NO)
   --maximum-parallel-testing-workers <n>  Limit spawned test runners when parallel is enabled
   --parallel-testing-worker-count <n>    Spawn exactly n test runners when parallel is enabled
+  --adhoc-signing                 Apply ad-hoc signing overrides for macOS runner reliability
   --run-id <id>                   Override run id
 
 Examples:
-  scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+  scripts/ui/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
     --destination 'platform=macOS'
 
-  scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+  scripts/ui/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
     --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
 
-  scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
-    --destination 'platform=macOS' --reuse-build
+  scripts/ui/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+    --destination 'platform=macOS' --reuse-build --derived-data /tmp/ui-loop/DerivedData
 EOF
 }
 
@@ -55,13 +55,14 @@ PROJECT=""
 SCHEME=""
 TEST_PLAN=""
 DESTINATION=""
-ARTIFACTS_DIR="./artifacts"
+ARTIFACTS_DIR="$REPO_ROOT/.artifacts/ui"
 DERIVED_DATA=""
 CONFIGURATION=""
 REUSE_BUILD=0
 XCTESTRUN=""
 ONLY_FAIL_ATTACH=0
 RUN_ID=""
+ADHOC_SIGNING=0
 
 PARALLEL_TESTING_ENABLED="NO"
 MAX_PARALLEL_WORKERS=""
@@ -92,6 +93,7 @@ while [[ $# -gt 0 ]]; do
     --parallel-testing-enabled) PARALLEL_TESTING_ENABLED="$2"; shift 2;;
     --maximum-parallel-testing-workers) MAX_PARALLEL_WORKERS="$2"; shift 2;;
     --parallel-testing-worker-count) PARALLEL_WORKER_COUNT="$2"; shift 2;;
+    --adhoc-signing) ADHOC_SIGNING=1; shift 1;;
     --run-id) RUN_ID="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown argument: $1" >&2; usage; exit 2;;
@@ -139,21 +141,23 @@ TOOLCHAIN_TXT="$RUN_DIR/toolchain.txt"
 
 "$SCRIPT_DIR/toolchain_fingerprint.sh" > "$TOOLCHAIN_TXT"
 
-# Helper to append repeatable args:
-append_repeatable() {
-  local flag="$1"; shift
-  local -a arr=("$@")
-  local -a out=()
-  local item
-  for item in "${arr[@]}"; do
-    out+=("$flag" "$item")
-  done
-  printf '%s\0' "${out[@]}"
+clean_result_bundle() {
+  if [[ -e "$RESULT_BUNDLE" ]]; then
+    rm -rf "$RESULT_BUNDLE"
+  fi
+}
+
+append_signing_overrides() {
+  if [[ "$ADHOC_SIGNING" -eq 1 ]]; then
+    # UI test runners modify a base runner app and must be re-signed.
+    # Ad-hoc signing avoids requiring a local developer cert while still producing a runnable bundle.
+    cmd+=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=-" "CODE_SIGNING_REQUIRED=NO")
+  fi
 }
 
 run_xcodebuild_test() {
   local action="$1"; shift
-  local -a cmd=("xcodebuild")
+  cmd=("xcodebuild")
 
   if [[ -n "$WORKSPACE" ]]; then cmd+=("-workspace" "$WORKSPACE"); fi
   if [[ -n "$PROJECT" ]]; then cmd+=("-project" "$PROJECT"); fi
@@ -165,16 +169,17 @@ run_xcodebuild_test() {
   if [[ -n "$DESTINATION" ]]; then cmd+=("-destination" "$DESTINATION"); fi
   if [[ -n "$DERIVED_DATA" ]]; then cmd+=("-derivedDataPath" "$DERIVED_DATA"); fi
 
-  # Test selection:
   local item
   for item in "${ONLY_TESTING[@]}"; do cmd+=("-only-testing" "$item"); done
   for item in "${SKIP_TESTING[@]}"; do cmd+=("-skip-testing" "$item"); done
   for item in "${ONLY_TEST_CONFIG[@]}"; do cmd+=("-only-test-configuration" "$item"); done
   for item in "${SKIP_TEST_CONFIG[@]}"; do cmd+=("-skip-test-configuration" "$item"); done
 
-  cmd+=("-resultBundlePath" "$RESULT_BUNDLE")
+  if [[ "$action" != "build-for-testing" ]]; then
+    clean_result_bundle
+    cmd+=("-resultBundlePath" "$RESULT_BUNDLE")
+  fi
 
-  # Determinism defaults: disable parallel testing unless explicitly enabled.
   cmd+=("-parallel-testing-enabled" "$PARALLEL_TESTING_ENABLED")
   if [[ -n "$PARALLEL_WORKER_COUNT" ]]; then
     cmd+=("-parallel-testing-worker-count" "$PARALLEL_WORKER_COUNT")
@@ -183,15 +188,17 @@ run_xcodebuild_test() {
   fi
 
   cmd+=("$action")
+  append_signing_overrides
 
   echo "==> Running: ${cmd[*]}" >&2
   "${cmd[@]}"
 }
 
 run_test_without_building() {
-  local -a cmd=("xcodebuild" "-xctestrun" "$XCTESTRUN")
+  cmd=("xcodebuild" "-xctestrun" "$XCTESTRUN")
 
   if [[ -n "$DESTINATION" ]]; then cmd+=("-destination" "$DESTINATION"); fi
+  clean_result_bundle
   cmd+=("-resultBundlePath" "$RESULT_BUNDLE")
   cmd+=("-parallel-testing-enabled" "$PARALLEL_TESTING_ENABLED")
   if [[ -n "$PARALLEL_WORKER_COUNT" ]]; then
@@ -200,13 +207,17 @@ run_test_without_building() {
     cmd+=("-maximum-parallel-testing-workers" "$MAX_PARALLEL_WORKERS")
   fi
   cmd+=("test-without-building")
+  append_signing_overrides
 
   echo "==> Running: ${cmd[*]}" >&2
   "${cmd[@]}"
 }
 
+xcodebuild_status=0
 if [[ -n "$XCTESTRUN" ]]; then
-  run_test_without_building
+  if ! run_test_without_building; then
+    xcodebuild_status=$?
+  fi
 elif [[ "$REUSE_BUILD" -eq 1 ]]; then
   if [[ -z "$DERIVED_DATA" ]]; then
     DERIVED_DATA="$RUN_DIR/DerivedData"
@@ -214,54 +225,66 @@ elif [[ "$REUSE_BUILD" -eq 1 ]]; then
 
   # build-for-testing embeds test-plan/test-config into the generated .xctestrun.
   # (Do not rely on -testPlan being honored by test-without-building.)
-  run_xcodebuild_test "build-for-testing"
+  if ! run_xcodebuild_test "build-for-testing"; then
+    xcodebuild_status=$?
+  else
+    mtime_of() {
+      local p="$1"
+      if stat -f %m "$p" >/dev/null 2>&1; then
+        stat -f %m "$p"
+      else
+        stat -c %Y "$p"
+      fi
+    }
 
-  # Find newest xctestrun under derived data (portable across macOS/Linux stat variants).
-  mtime_of() {
-    local p="$1"
-    if stat -f %m "$p" >/dev/null 2>&1; then
-      stat -f %m "$p"
-    else
-      stat -c %Y "$p"
+    xctestruns=()
+    f=""
+    while IFS= read -r -d '' f; do
+      xctestruns+=("$f")
+    done < <(find "$DERIVED_DATA" -name '*.xctestrun' -print0 2>/dev/null || true)
+
+    newest=""
+    newest_m=0
+    m=""
+    for f in "${xctestruns[@]}"; do
+      m="$(mtime_of "$f" || echo 0)"
+      if [[ -z "$newest" || "$m" -gt "$newest_m" ]]; then
+        newest="$f"
+        newest_m="$m"
+      fi
+    done
+
+    XCTESTRUN="$newest"
+    if [[ -z "$XCTESTRUN" ]]; then
+      echo "Could not locate .xctestrun under derived data: $DERIVED_DATA" >&2
+      xcodebuild_status=3
+    elif ! run_test_without_building; then
+      xcodebuild_status=$?
     fi
-  }
-
-  xctestruns=()
-  f=""
-  while IFS= read -r -d '' f; do
-    xctestruns+=("$f")
-  done < <(find "$DERIVED_DATA" -name '*.xctestrun' -print0 2>/dev/null || true)
-
-  newest=""
-  newest_m=0
-  m=""
-  for f in "${xctestruns[@]}"; do
-    m="$(mtime_of "$f" || echo 0)"
-    if [[ -z "$newest" || "$m" -gt "$newest_m" ]]; then
-      newest="$f"
-      newest_m="$m"
-    fi
-  done
-  XCTESTRUN="$newest"
-  if [[ -z "$XCTESTRUN" ]]; then
-    echo "Could not locate .xctestrun under derived data: $DERIVED_DATA" >&2
-    exit 3
   fi
-
-  run_test_without_building
 else
-  run_xcodebuild_test "test"
+  if ! run_xcodebuild_test "test"; then
+    xcodebuild_status=$?
+  fi
 fi
 
-"$SCRIPT_DIR/xcresult_summary.sh" "$RESULT_BUNDLE" "$SUMMARY_JSON"
-
-EXPORT_ARGS=()
-if [[ "$ONLY_FAIL_ATTACH" -eq 1 ]]; then
-  EXPORT_ARGS+=("--only-failures")
+if [[ -d "$RESULT_BUNDLE" ]]; then
+  "$SCRIPT_DIR/xcresult_summary.sh" "$RESULT_BUNDLE" "$SUMMARY_JSON" || true
+else
+  echo "{}" > "$SUMMARY_JSON"
 fi
-"$SCRIPT_DIR/xcresult_export.sh" "$RESULT_BUNDLE" "$RUN_DIR" "${EXPORT_ARGS[@]}"
+
+if [[ -d "$RESULT_BUNDLE" ]]; then
+  EXPORT_ARGS=()
+  if [[ "$ONLY_FAIL_ATTACH" -eq 1 ]]; then
+    EXPORT_ARGS+=("--only-failures")
+  fi
+  "$SCRIPT_DIR/xcresult_export.sh" "$RESULT_BUNDLE" "$RUN_DIR" "${EXPORT_ARGS[@]}" || true
+fi
 
 echo "==> Done."
 echo "Run dir: $RUN_DIR"
 echo "Result bundle: $RESULT_BUNDLE"
 echo "Summary: $SUMMARY_JSON"
+
+exit "$xcodebuild_status"
