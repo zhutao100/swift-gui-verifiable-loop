@@ -5,13 +5,13 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/simctl_prepare.sh --udid <udid> [--erase] [--boot] [--shutdown]
+  scripts/ios/simctl_prepare.sh --udid <udid> [--erase] [--boot] [--shutdown]
 
   # Find devices:
   xcrun simctl list devices
 
 Examples:
-  scripts/simctl_prepare.sh --udid <UDID> --shutdown --erase --boot
+  scripts/ios/simctl_prepare.sh --udid <UDID> --shutdown --erase --boot
 EOF
 }
 

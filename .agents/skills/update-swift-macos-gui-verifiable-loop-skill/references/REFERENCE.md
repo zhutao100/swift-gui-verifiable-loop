@@ -22,8 +22,8 @@
 
 ## Script integrity
 
-- [ ] `scripts/ui_loop.sh` produces `results.xcresult`, `summary.json`, and exported artifacts.
-- [ ] `scripts/xcresult_summary.sh` uses structured subcommands when available.
+- [ ] `scripts/ui/ui_loop.sh` produces `results.xcresult`, `summary.json`, and exported artifacts.
+- [ ] `scripts/ui/xcresult_summary.sh` uses structured subcommands when available.
 - [ ] iOS simulator scripts live under `scripts/ios/` and are optional.
 
 ## Security posture

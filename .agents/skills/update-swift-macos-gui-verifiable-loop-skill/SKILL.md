@@ -73,7 +73,7 @@ Update `swift-gui-verifiable-loop/references/*.md` and templates to reflect veri
 
 If you have a sample Xcode project available locally:
 
-- Run `scripts/ui_loop.sh` once for macOS, once for iOS Simulator.
+- Run `scripts/ui/ui_loop.sh` once for macOS, once for iOS Simulator.
 - Confirm `.xcresult` is produced and `summary.json` and exported attachments exist.
 
 ### 5) Preserve standards compliance

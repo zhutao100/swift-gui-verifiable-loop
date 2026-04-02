@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
-  echo "Usage: scripts/xcresult_summary.sh <results.xcresult> <out.json>" >&2
+  echo "Usage: $(basename "${BASH_SOURCE[0]}") <results.xcresult> <out.json>" >&2
   exit 2
 fi
 

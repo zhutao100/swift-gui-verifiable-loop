@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: scripts/xcresult_export.sh <results.xcresult> <out_dir> [--only-failures]" >&2
+  echo "Usage: $(basename "${BASH_SOURCE[0]}") <results.xcresult> <out_dir> [--only-failures]" >&2
   exit 2
 fi
 

@@ -12,7 +12,7 @@ compatibility: |
   - Network recommended for fetching Swift packages and documentation.
 metadata:
   author: generated-by-chatgpt
-  version: "1.0"
+  version: "1.1"
   tags: swift swiftui appkit uikit xcodebuild xcresult xcresulttool snapshot-testing xctest xcuittest accessibility audit agentic macos ios
 ---
 
@@ -86,34 +86,34 @@ Use the orchestrator script (recommended).
 **macOS example:**
 
 ```bash
-scripts/ui_loop.sh \
+scripts/ui/ui_loop.sh \
   --workspace App.xcworkspace \
   --scheme App \
   --test-plan Smoke \
-  --destination 'platform=macOS' \
-  --artifacts-dir ./artifacts
+  --destination 'platform=macOS'
 ```
 
 **iOS Simulator example:**
 
 ```bash
-scripts/ui_loop.sh \
+scripts/ui/ui_loop.sh \
   --workspace App.xcworkspace \
   --scheme App \
   --test-plan Smoke \
-  --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' \
-  --artifacts-dir ./artifacts
+  --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
 ```
 
 (For iOS 26 environments, use `OS=26.0` in the destination.)
 
 Outputs per run:
 
-- `artifacts/<run-id>/results.xcresult` (immutable evidence)
-- `artifacts/<run-id>/toolchain.txt` (environment fingerprint)
-- `artifacts/<run-id>/summary.json` (machine-readable test summary)
-- `artifacts/<run-id>/attachments/**` (exported screenshots/attachments)
-- `artifacts/<run-id>/diagnostics/**` (crash logs, diagnostics)
+- `<artifacts-dir>/<run-id>/results.xcresult` (immutable evidence)
+- `<artifacts-dir>/<run-id>/toolchain.txt` (environment fingerprint)
+- `<artifacts-dir>/<run-id>/summary.json` (machine-readable test summary)
+- `<artifacts-dir>/<run-id>/attachments/**` (exported screenshots/attachments)
+- `<artifacts-dir>/<run-id>/diagnostics/**` (crash logs, diagnostics)
+
+Default artifacts dir: `./.artifacts/ui` (add `/.artifacts/` to your project’s `.gitignore`).
 
 If you prefer manual commands, see `references/xcresult-bundles.md`.
 
@@ -177,7 +177,7 @@ In UI tests, attach:
 `.xcresult` already stores these; export them after each run.
 
 Template: `assets/templates/XCUITestLaunchHarnessTemplate.swift`
-Extraction scripts: `scripts/xcresult_export.sh`, `scripts/xcresult_summary.sh`
+Extraction scripts (canonical): `scripts/ui/xcresult_export.sh`, `scripts/ui/xcresult_summary.sh`
 
 ---
 
@@ -185,7 +185,7 @@ Extraction scripts: `scripts/xcresult_export.sh`, `scripts/xcresult_summary.sh`
 
 After each code change:
 
-1. Run **Step 1** (`scripts/ui_loop.sh`).
+1. Run **Step 1** (`scripts/ui/ui_loop.sh`).
 2. If compilation/tests fail:
    - fix failures first; do not proceed.
 3. If snapshot diffs fail:
@@ -213,9 +213,9 @@ See `references/REFERENCE.md` for deeper troubleshooting and patterns.
 
 # Quick file map
 
-- Orchestrator: `scripts/ui_loop.sh`
-- Evidence extraction: `scripts/xcresult_summary.sh`, `scripts/xcresult_export.sh`
-- Toolchain fingerprint: `scripts/toolchain_fingerprint.sh`
+- Orchestrator (canonical): `scripts/ui/ui_loop.sh`
+- Evidence extraction (canonical): `scripts/ui/xcresult_summary.sh`, `scripts/ui/xcresult_export.sh`
+- Toolchain fingerprint (canonical): `scripts/ui/toolchain_fingerprint.sh`
 - Templates: `assets/templates/*.swift`
 - Deeper reference: `references/REFERENCE.md`
 

@@ -51,7 +51,8 @@ Notes:
 When you need extra evidence outside of `.xcresult` attachments:
 
 ```bash
-xcrun simctl io <UDID> screenshot ./artifacts/sim_screenshot.png
-xcrun simctl io <UDID> recordVideo ./artifacts/sim_video.mp4
+xcrun simctl io <UDID> screenshot ./.artifacts/ui/sim_screenshot.png
+xcrun simctl io <UDID> recordVideo ./.artifacts/ui/sim_video.mp4
 # Stop recording with Ctrl-C
 ```
+Tip: prefer an ignored artifacts directory like `./.artifacts/ui` for these outputs.

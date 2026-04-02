@@ -33,41 +33,41 @@ Agents must not guess these values.
    macOS example:
 
    ```bash
-   scripts/ui_loop.sh \
+   scripts/ui/ui_loop.sh \
      --workspace App.xcworkspace \
      --scheme App \
      --test-plan Smoke \
-     --destination 'platform=macOS' \
-     --artifacts-dir ./artifacts
+     --destination 'platform=macOS'
    ```
 
    iOS Simulator example:
 
    ```bash
-   scripts/ui_loop.sh \
+   scripts/ui/ui_loop.sh \
      --workspace App.xcworkspace \
      --scheme App \
      --test-plan Smoke \
-     --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0' \
-     --artifacts-dir ./artifacts
+     --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
    ```
 
    (For iOS 26 environments, use `OS=26.0` in the destination.)
 
-3. Inspect `artifacts/<run-id>/summary.json`.
+3. Inspect `<artifacts-dir>/<run-id>/summary.json` (default artifacts dir: `./.artifacts/ui`).
 4. If failed, inspect exported artifacts:
-   - `artifacts/<run-id>/attachments/**`
-   - `artifacts/<run-id>/diagnostics/**`
-   - `artifacts/<run-id>/logs/**`
-   - `artifacts/<run-id>/toolchain.txt`
+   - `<artifacts-dir>/<run-id>/attachments/**`
+   - `<artifacts-dir>/<run-id>/diagnostics/**`
+   - `<artifacts-dir>/<run-id>/logs/**`
+   - `<artifacts-dir>/<run-id>/toolchain.txt`
 5. Make the next fix based strictly on evidence.
+
+Tip: add `/.artifacts/` to your project’s `.gitignore`.
 
 ## Fast inner loop (target one test)
 
 When you know the affected test(s), run just that subset:
 
 ```bash
-scripts/ui_loop.sh \
+scripts/ui/ui_loop.sh \
   --workspace App.xcworkspace \
   --scheme App \
   --test-plan Smoke \
@@ -86,7 +86,7 @@ Example:
 
 ```bash
 SNAPSHOT_RECORD=1 \
-scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+scripts/ui/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
   --destination 'platform=macOS'
 ```
 
@@ -94,7 +94,7 @@ iOS Simulator example:
 
 ```bash
 SNAPSHOT_RECORD=1 \
-scripts/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
+scripts/ui/ui_loop.sh --workspace App.xcworkspace --scheme App --test-plan Smoke \
   --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
 ```
 
@@ -129,14 +129,14 @@ This skill disables parallel test runners by default:
 You may enable parallelization only when you have evidence it is stable for the affected suite:
 
 ```bash
-scripts/ui_loop.sh ... --parallel-testing-enabled YES --maximum-parallel-testing-workers 2
+scripts/ui/ui_loop.sh ... --parallel-testing-enabled YES --maximum-parallel-testing-workers 2
 ```
 
 ## Failure triage playbook
 
 When a run fails:
 
-1. Open `summary.json` to identify the failing target/test.
+1. Open `<artifacts-dir>/<run-id>/summary.json` to identify the failing target/test.
 2. If it is a UI test failure:
    - inspect attachments (screenshots/videos when present)
    - check accessibility identifiers
