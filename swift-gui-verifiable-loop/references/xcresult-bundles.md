@@ -24,7 +24,7 @@ This skill keeps the bundle and derives:
 
 ## Recommended command shapes
 
-Tip: if you have it, prefer `scripts/ui/ui_loop.sh` for an evidence-first run. The commands below are the underlying primitives.
+Tip: if you have it, prefer `scripts/ui/ui_loop.sh` for an evidence-first run. The script can auto-discover a root `.xcworkspace`/`.xcodeproj` from `--package-root` (or the repo root) and captures `xcodebuild-*.log` files per run unless `VERBOSE=1` is set. The commands below are the underlying primitives.
 
 ### macOS
 

@@ -8,12 +8,15 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
+  scripts/ui/ui_loop.sh --scheme <name> [options]
+
+  # Xcode mode (optional):
   scripts/ui/ui_loop.sh (--workspace <path> | --project <path>) --scheme <name> [options]
 
 Required:
   --scheme <name>                 Xcode scheme name
 
-One of:
+Xcode mode (optional):
   --workspace <path>              Path to .xcworkspace
   --project <path>                Path to .xcodeproj
 
@@ -23,6 +26,7 @@ Recommended:
   --artifacts-dir <dir>           Output root (default: ./.artifacts/ui)
 
 Optional:
+  --package-root <dir>            SwiftPM package root (default: repo root)
   --derived-data <dir>            DerivedData path (default: <run-dir>/DerivedData when --reuse-build)
   --configuration <name>          e.g. Debug / Release
   --only-testing <id>             Repeatable. TestTarget[/TestClass[/TestMethod]]
@@ -54,8 +58,9 @@ WORKSPACE=""
 PROJECT=""
 SCHEME=""
 TEST_PLAN=""
-DESTINATION=""
+DESTINATION="platform=macOS"
 ARTIFACTS_DIR="$REPO_ROOT/.artifacts/ui"
+PACKAGE_ROOT="$REPO_ROOT"
 DERIVED_DATA=""
 CONFIGURATION=""
 REUSE_BUILD=0
@@ -63,6 +68,7 @@ XCTESTRUN=""
 ONLY_FAIL_ATTACH=0
 RUN_ID=""
 ADHOC_SIGNING=0
+VERBOSE="${VERBOSE:-0}"
 
 PARALLEL_TESTING_ENABLED="NO"
 MAX_PARALLEL_WORKERS=""
@@ -81,6 +87,7 @@ while [[ $# -gt 0 ]]; do
     --test-plan) TEST_PLAN="$2"; shift 2;;
     --destination) DESTINATION="$2"; shift 2;;
     --artifacts-dir) ARTIFACTS_DIR="$2"; shift 2;;
+    --package-root) PACKAGE_ROOT="$2"; shift 2;;
     --derived-data) DERIVED_DATA="$2"; shift 2;;
     --configuration) CONFIGURATION="$2"; shift 2;;
     --only-testing) ONLY_TESTING+=("$2"); shift 2;;
@@ -111,6 +118,53 @@ if [[ -z "$SCHEME" ]]; then
   exit 2
 fi
 
+discover_xcode_container() {
+  local root="$1"
+  local workspaces=()
+  local projects=()
+  local path=""
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    workspaces+=("$path")
+  done < <(find "$root" -maxdepth 1 -type d -name '*.xcworkspace' -print | LC_ALL=C sort)
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    projects+=("$path")
+  done < <(find "$root" -maxdepth 1 -type d -name '*.xcodeproj' -print | LC_ALL=C sort)
+
+  if [[ ${#workspaces[@]} -gt 1 ]]; then
+    echo $'Multiple .xcworkspace entries found. Pass --workspace to choose one:\n'"${workspaces[*]}" >&2
+    exit 2
+  fi
+  if [[ ${#workspaces[@]} -eq 1 ]]; then
+    printf '%s' "${workspaces[0]}"
+    return 0
+  fi
+
+  if [[ ${#projects[@]} -gt 1 ]]; then
+    echo $'Multiple .xcodeproj entries found. Pass --project to choose one:\n'"${projects[*]}" >&2
+    exit 2
+  fi
+  if [[ ${#projects[@]} -eq 1 ]]; then
+    printf '%s' "${projects[0]}"
+    return 0
+  fi
+
+  return 1
+}
+
+if [[ -z "$XCTESTRUN" && -z "$WORKSPACE" && -z "$PROJECT" ]]; then
+  if container="$(discover_xcode_container "$PACKAGE_ROOT")"; then
+    case "$container" in
+      *.xcworkspace) WORKSPACE="$container" ;;
+      *.xcodeproj) PROJECT="$container" ;;
+      *) ;;
+    esac
+  fi
+fi
+
 if [[ -n "$XCTESTRUN" ]]; then
   if [[ -n "$WORKSPACE" || -n "$PROJECT" ]]; then
     echo "--xctestrun cannot be used with --workspace/--project (xcodebuild restriction)" >&2
@@ -118,9 +172,10 @@ if [[ -n "$XCTESTRUN" ]]; then
   fi
 else
   if [[ -z "$WORKSPACE" && -z "$PROJECT" ]]; then
-    echo "Must provide --workspace or --project" >&2
-    usage
-    exit 2
+    if [[ ! -f "$PACKAGE_ROOT/Package.swift" ]]; then
+      echo "SwiftPM mode requires Package.swift under --package-root: $PACKAGE_ROOT" >&2
+      exit 2
+    fi
   fi
   if [[ -n "$WORKSPACE" && -n "$PROJECT" ]]; then
     echo "Provide only one of --workspace/--project" >&2
@@ -140,6 +195,10 @@ SUMMARY_JSON="$RUN_DIR/summary.json"
 TOOLCHAIN_TXT="$RUN_DIR/toolchain.txt"
 
 "$SCRIPT_DIR/toolchain_fingerprint.sh" > "$TOOLCHAIN_TXT"
+
+if [[ -z "$DERIVED_DATA" ]]; then
+  DERIVED_DATA="$RUN_DIR/DerivedData"
+fi
 
 clean_result_bundle() {
   if [[ -e "$RESULT_BUNDLE" ]]; then
@@ -190,8 +249,21 @@ run_xcodebuild_test() {
   cmd+=("$action")
   append_signing_overrides
 
+  local log_file="$RUN_DIR/xcodebuild-${action}.log"
+  : >"$log_file"
+
   echo "==> Running: ${cmd[*]}" >&2
-  "${cmd[@]}"
+  if [[ "$VERBOSE" == "1" ]]; then
+    (cd "$PACKAGE_ROOT" && "${cmd[@]}")
+    return $?
+  fi
+
+  if ! (cd "$PACKAGE_ROOT" && "${cmd[@]}") >"$log_file" 2>&1; then
+    local status=$?
+    echo "==> xcodebuild failed (log: $log_file)" >&2
+    tail -n 200 "$log_file" >&2 || true
+    return "$status"
+  fi
 }
 
 run_test_without_building() {
@@ -209,8 +281,21 @@ run_test_without_building() {
   cmd+=("test-without-building")
   append_signing_overrides
 
+  local log_file="$RUN_DIR/xcodebuild-test-without-building.log"
+  : >"$log_file"
+
   echo "==> Running: ${cmd[*]}" >&2
-  "${cmd[@]}"
+  if [[ "$VERBOSE" == "1" ]]; then
+    (cd "$PACKAGE_ROOT" && "${cmd[@]}")
+    return $?
+  fi
+
+  if ! (cd "$PACKAGE_ROOT" && "${cmd[@]}") >"$log_file" 2>&1; then
+    local status=$?
+    echo "==> xcodebuild failed (log: $log_file)" >&2
+    tail -n 200 "$log_file" >&2 || true
+    return "$status"
+  fi
 }
 
 xcodebuild_status=0

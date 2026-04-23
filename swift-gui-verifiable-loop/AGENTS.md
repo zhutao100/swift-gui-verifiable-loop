@@ -22,6 +22,7 @@ Before iterating, collect these constants from the target project and write them
 - Destination string:
   - macOS: `platform=macOS` (optionally include `arch=arm64` / `arch=x86_64`)
   - iOS Simulator: `platform=iOS Simulator,name=<device>,OS=<version>` (prefer a simulator UDID when you need strict repeatability)
+- Optional package root override when `scripts/ui/ui_loop.sh` should search somewhere other than the repo root
 
 Agents must not guess these values.
 
@@ -34,17 +35,14 @@ Agents must not guess these values.
 
    ```bash
    scripts/ui/ui_loop.sh \
-     --workspace App.xcworkspace \
      --scheme App \
-     --test-plan Smoke \
-     --destination 'platform=macOS'
+     --test-plan Smoke
    ```
 
    iOS Simulator example:
 
    ```bash
    scripts/ui/ui_loop.sh \
-     --workspace App.xcworkspace \
      --scheme App \
      --test-plan Smoke \
      --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
@@ -57,10 +55,12 @@ Agents must not guess these values.
    - `<artifacts-dir>/<run-id>/attachments/**`
    - `<artifacts-dir>/<run-id>/diagnostics/**`
    - `<artifacts-dir>/<run-id>/logs/**`
+   - `<artifacts-dir>/<run-id>/xcodebuild-*.log`
    - `<artifacts-dir>/<run-id>/toolchain.txt`
 5. Make the next fix based strictly on evidence.
 
 Tip: add `/.artifacts/` to your project’s `.gitignore`.
+Tip: set `VERBOSE=1` when you want live `xcodebuild` output instead of per-run log files.
 
 ## Fast inner loop (target one test)
 

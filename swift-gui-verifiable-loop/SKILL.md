@@ -48,12 +48,13 @@ A reliable GUI loop is typically **hybrid**:
 
 ## Inputs you must collect (one-time per project)
 
-- Workspace or project: `App.xcworkspace` or `App.xcodeproj`
+- Workspace or project: `App.xcworkspace` or `App.xcodeproj` (optional when `scripts/ui/ui_loop.sh` can auto-discover one at the package root)
 - Scheme: `App`
 - Test plan (recommended): `Smoke` (a `.xctestplan` attached to the scheme)
 - Destination:
   - macOS: `platform=macOS` (optionally include `arch=arm64` or `arch=x86_64`)
   - iOS Simulator: `platform=iOS Simulator,name=<device>,OS=<version>` (prefer a simulator **UDID** when you need strict repeatability)
+- Package root (optional): pass `--package-root <dir>` when the script should search somewhere other than the repo root for a package/Xcode container
 - Optional: derived data directory for repeatable runs
 
 Keep these as constants in your project docs (e.g., `AGENTS.md`) so agents never guess.
@@ -86,17 +87,14 @@ Use the orchestrator script (recommended).
 
 ```bash
 scripts/ui/ui_loop.sh \
-  --workspace App.xcworkspace \
   --scheme App \
-  --test-plan Smoke \
-  --destination 'platform=macOS'
+  --test-plan Smoke
 ```
 
 **iOS Simulator example:**
 
 ```bash
 scripts/ui/ui_loop.sh \
-  --workspace App.xcworkspace \
   --scheme App \
   --test-plan Smoke \
   --destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
@@ -109,6 +107,7 @@ Outputs per run:
 - `<artifacts-dir>/<run-id>/results.xcresult` (immutable evidence)
 - `<artifacts-dir>/<run-id>/toolchain.txt` (environment fingerprint)
 - `<artifacts-dir>/<run-id>/summary.json` (machine-readable test summary)
+- `<artifacts-dir>/<run-id>/xcodebuild-*.log` (captured `xcodebuild` logs unless `VERBOSE=1`)
 - `<artifacts-dir>/<run-id>/attachments/**` (exported screenshots/attachments)
 - `<artifacts-dir>/<run-id>/diagnostics/**` (crash logs, diagnostics)
 
