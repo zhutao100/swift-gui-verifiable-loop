@@ -14,6 +14,23 @@ Common settings involved:
 - **System Settings → Privacy & Security → Automation** (Terminal/Xcode controlling other apps)
 - **System Settings → Privacy & Security → Developer Tools** (enable the terminal app you use to run `xcodebuild`, e.g. Terminal)
 
+## "XCTest is trying to Enable UI Automation" password prompt
+
+On some macOS developer machines, the first UI-test run can block before app launch with a modal password prompt that says **"XCTest is trying to Enable UI Automation."**
+
+Symptoms in `.xcresult` / `xcodebuild`:
+
+- `The test runner failed to initialize for UI testing`
+- `Timed out while enabling automation mode`
+- no app screenshots or test attachments because the app never launched
+
+Agent policy:
+
+1. Keep the failed `.xcresult` and exported diagnostics.
+2. Try the least-invasive mitigations once: `--adhoc-signing`, then `--reuse-build --derived-data /tmp/<name>`.
+3. If the same prompt/timeout repeats, stop retrying the UI test loop and report that the human must approve the password prompt or pre-grant the relevant Automation/Accessibility permission.
+4. When useful, continue qualitative verification with deterministic app launch arguments plus `screencapture` / window-level screenshots; label that evidence as a fallback, not a replacement for a passing XCUITest gate.
+
 ## Gatekeeper / syspolicyd symptoms (macOS 15+)
 
 You may see UI test failures like:

@@ -118,6 +118,7 @@ If you prefer manual commands, see `references/xcresult-bundles.md`.
 ## Platform notes (read once)
 
 - macOS UI tests may require Accessibility/Automation permissions for the UI test runner. See `references/macos-ui-testing-permissions.md`.
+- If macOS shows an "XCTest is trying to Enable UI Automation" password prompt, preserve the `.xcresult`, try the documented mitigations once, then ask the human to grant the OS permission instead of repeatedly rerunning.
 - iOS simulator runs benefit from simulator-state and permission control via `simctl`. See `references/ios-simulator-determinism.md`.
 
 ## Step 2 — Add snapshot tests for stable UI surfaces
