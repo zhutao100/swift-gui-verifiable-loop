@@ -113,6 +113,11 @@ UI tests are valuable but inherently fragile. Keep them:
 - **accessibility-first** (stable identifiers, no localized-string selectors)
 - **artifact-rich** (screenshots, JSON dumps, logs as attachments)
 
+For macOS menu bar extras:
+
+- Prefer a launch harness that opens the popover/context menu in `--uitest` mode.
+- Treat direct `NSStatusItem` clicking as optional evidence; it may not be hittable even when the item exists in the accessibility tree.
+
 See templates in `assets/templates/`.
 
 iOS simulator helpers:

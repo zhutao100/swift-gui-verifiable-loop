@@ -16,9 +16,11 @@ final class AccessibilityAuditSmokeTests: XCTestCase {
     try app.performAccessibilityAudit(for: .all)
 
     // Optional: ignore known issues with an explicit policy.
-    // try app.performAccessibilityAudit(for: [.dynamicType, .contrast]) { issue in
-    //   // Return true to ignore this issue.
-    //   false
+    // Keep ignores narrow and evidence-backed, especially on macOS where system-hosted controls
+    // (for example, Touch Bar items) can leak into the audit surface.
+    // try app.performAccessibilityAudit(for: .all) { issue in
+    //   issue.compactDescription == "Action is missing"
+    //     && issue.detailedDescription.contains("click/tap inputs")
     // }
   }
 }

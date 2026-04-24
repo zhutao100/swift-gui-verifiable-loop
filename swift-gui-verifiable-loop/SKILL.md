@@ -148,6 +148,8 @@ try app.performAccessibilityAudit()
 
 This produces a high-signal, machine-actionable gate.
 
+On macOS, be prepared to ignore narrowly-scoped host/framework noise with an explicit closure when the audit traverses synthetic SwiftUI container nodes or system-owned controls (for example, Touch Bar items) that are outside your app's actionable surface.
+
 Template: `assets/templates/AccessibilityAuditUITestTemplate.swift`
 Reference: `references/accessibility-audit.md`
 
@@ -158,10 +160,12 @@ UI tests are valuable, but operationally fragile. Use them as *proof-of-life* fl
 - launch → first interactive screen → one key action
 - document/window creation
 - settings toggle persists after relaunch
+- menu bar extra popover/context menu via a deterministic launch harness when direct `NSStatusItem` clicks are not hittable under XCUITest
 
 Templates:
 
 - macOS: `assets/templates/XCUITestLaunchHarnessTemplate.swift` (uses `click()` and shows menu patterns)
+- macOS menu bar extras: `assets/templates/MacOSMenuBarExtraUITestTemplate.swift`
 - iOS: `assets/templates/iOSXCUITestLaunchHarnessTemplate.swift` (uses `tap()` and includes a basic interruption monitor)
 
 ## Step 5 — Always enrich failures with artifacts

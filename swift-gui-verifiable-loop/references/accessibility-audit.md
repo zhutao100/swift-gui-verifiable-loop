@@ -39,4 +39,11 @@ try app.performAccessibilityAudit(for: [.dynamicType, .contrast]) { issue in
 }
 ```
 
+On macOS, keep the ignore policy narrow. Good examples are:
+
+- synthetic SwiftUI container groups emitted by a hosting bridge, when the actionable descendants are already labeled
+- host/system controls outside your app surface (for example, Touch Bar items) that still appear in the audit tree
+
+Avoid broad rules such as "ignore all missing descriptions" unless you can tie them to a specific host-generated element class or reproducible framework issue.
+
 Template: `assets/templates/AccessibilityAuditUITestTemplate.swift`

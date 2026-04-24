@@ -19,6 +19,8 @@ swift-gui-verifiable-loop/scripts/ui/ui_loop.sh --scheme App --test-plan Smoke \
 
 (Default destination is `platform=macOS`; set `VERBOSE=1` to stream `xcodebuild` output instead of writing per-run logs under the artifacts directory.)
 
+(`scripts/ui/ui_loop.sh` exits non-zero when either `xcodebuild` fails or the exported xcresult summary reports a non-passing result.)
+
 (Use `OS=26.0` when targeting iOS 26 simulator runtimes.)
 
 See `swift-gui-verifiable-loop/references/REFERENCE.md` for detailed guidance.

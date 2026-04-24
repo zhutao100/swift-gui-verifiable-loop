@@ -46,6 +46,7 @@ See `references/tca-teststore.md`.
 Implement one or more of:
 
 - Launch arguments: `--uitest` / `--seed-fixtures` / `--start-screen Settings`
+- macOS menu bar extras: add a launch arg such as `--open-status-surface popover|context-menu` so UI tests can ask the app to present the extra deterministically
 - Launch environment: `FIXTURE_SET=smoke`, `NETWORK_MODE=stubbed`
 - Deep links: `myapp://open/settings?tab=general`
 
@@ -70,6 +71,7 @@ If a UI smoke test flakes:
 - Verify identifiers (not copy-based queries).
 - Reduce scope (shorter test).
 - Prefer deterministic entry harnesses over navigation.
+- For menu bar extras on macOS, do not assume the `NSStatusItem` is hittable even when it exists in the accessibility tree; prefer a launch harness that opens the popover/context menu.
 - Disable animations in test mode.
 - Export `.xcresult` attachments and inspect screenshots/logs.
 
