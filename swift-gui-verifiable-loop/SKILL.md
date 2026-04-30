@@ -11,7 +11,7 @@ compatibility: |
   - Xcode CLI tools: xcodebuild, xcrun/xcresulttool (Xcode 16+ recommended; Xcode 15+ required for accessibility audits).
   - Network recommended for fetching Swift packages and documentation.
 metadata:
-  version: "1.1"
+  version: "1.2"
   tags: swift swiftui appkit uikit xcodebuild xcresult xcresulttool snapshot-testing xctest xcuittest accessibility audit agentic macos ios
 ---
 
@@ -59,6 +59,17 @@ A reliable GUI loop is typically **hybrid**:
 
 Keep these as constants in your project docs (e.g., `AGENTS.md`) so agents never guess.
 
+If the target project already has an older copied `scripts/ui/ui_loop.sh`, refresh the managed scripts before using newer options:
+
+```bash
+/path/to/swift-gui-verifiable-loop/scripts/project/update_ui_loop_tools.sh \
+  --apply \
+  --platform macos \
+  /path/to/target-repo
+```
+
+Use `--platform ios` for iOS-only apps and `--platform both` for shared macOS/iOS repos. This updater is intentionally limited to the skill-owned scripts; update project docs and test launch harnesses separately.
+
 ---
 
 # Step-by-step closed-loop workflow
@@ -91,6 +102,20 @@ scripts/ui/ui_loop.sh \
   --test-plan Smoke
 ```
 
+**Agent-safe macOS UI example (preferred when full-screen XCTest screenshots are a concern):**
+
+```bash
+scripts/ui/ui_loop.sh \
+  --workspace App.xcworkspace \
+  --scheme App \
+  --test-plan Smoke \
+  --destination 'platform=macOS' \
+  --reuse-build \
+  --system-attachment-lifetime keepNever \
+  --sanitize-screenshots redact-suspect \
+  --delete-raw-attachments
+```
+
 **iOS Simulator example:**
 
 ```bash
@@ -108,7 +133,10 @@ Outputs per run:
 - `<artifacts-dir>/<run-id>/toolchain.txt` (environment fingerprint)
 - `<artifacts-dir>/<run-id>/summary.json` (machine-readable test summary)
 - `<artifacts-dir>/<run-id>/xcodebuild-*.log` (captured `xcodebuild` logs unless `VERBOSE=1`)
-- `<artifacts-dir>/<run-id>/attachments/**` (exported screenshots/attachments)
+- `<artifacts-dir>/<run-id>/attachments/**` (exported screenshots/attachments; sanitized when `--sanitize-screenshots` is used)
+- `<artifacts-dir>/<run-id>/attachments_raw/**` (raw export only when screenshot sanitization is enabled and raw deletion is not requested)
+- `<artifacts-dir>/<run-id>/attachment_sanitization.json` (sanitizer report when enabled)
+- `<artifacts-dir>/<run-id>/xctestrun-attachment-policy.json` (`.xctestrun` patch report when attachment lifetime policy is patched)
 - `<artifacts-dir>/<run-id>/diagnostics/**` (crash logs, diagnostics)
 
 Default artifacts dir: `./.artifacts/ui` (add `/.artifacts/` to your project’s `.gitignore`).
@@ -118,7 +146,8 @@ If you prefer manual commands, see `references/xcresult-bundles.md`.
 ## Platform notes (read once)
 
 - macOS UI tests may require Accessibility/Automation permissions for the UI test runner. See `references/macos-ui-testing-permissions.md`.
-- If macOS shows an "XCTest is trying to Enable UI Automation" password prompt, preserve the `.xcresult`, try the documented mitigations once, then ask the human to grant the OS permission instead of repeatedly rerunning.
+- If macOS shows an "XCTest is trying to Enable UI Automation" password prompt, preserve the `.xcresult`, capture TCC attribution with `scripts/macos/tcc_attribution_tail.sh`, try the documented mitigations once, then ask the human or MDM policy owner to grant the OS permission instead of repeatedly rerunning.
+- For agent-facing macOS runs, prefer `--reuse-build --system-attachment-lifetime keepNever --sanitize-screenshots redact-suspect --delete-raw-attachments` so automatic full-screen screenshots are discarded and exported attachments are sanitized. See `references/artifact-privacy.md`.
 - iOS simulator runs benefit from simulator-state and permission control via `simctl`. See `references/ios-simulator-determinism.md`.
 
 ## Step 2 — Add snapshot tests for stable UI surfaces
@@ -173,13 +202,13 @@ Templates:
 
 In UI tests, attach:
 
-- screenshots on failure
+- window/root-element screenshots on failure; use `XCUIApplication.screenshot()` only after confirming it is app-scoped on that platform/runner, and avoid `XCUIScreen.main.screenshot()` for macOS agent runs
 - any relevant exported files
-- optional debug JSON state dumps (debug builds only)
+- optional debug JSON state dumps or accessibility-tree text dumps (debug builds only)
 
 `.xcresult` already stores these; export them after each run.
 
-Template: `assets/templates/XCUITestLaunchHarnessTemplate.swift`
+Templates: `assets/templates/XCUITestLaunchHarnessTemplate.swift`, `assets/templates/AgentSafeUITestArtifactsTemplate.swift`
 Extraction scripts (canonical): `scripts/ui/xcresult_export.sh`, `scripts/ui/xcresult_summary.sh`
 
 ---
@@ -208,6 +237,7 @@ After each code change:
 - **GUI nondeterminism** → push logic into unit tests + launch harnesses.
 - **Flaky UI queries** → stable accessibility identifiers, concise queries, small smoke flows.
 - **Hard-to-interpret failures** → `.xcresult` as evidence + exported attachments/diagnostics.
+- **Sensitive/full-screen screenshots** → patch automatic attachment lifetimes, attach app-scoped screenshots, and sanitize exports.
 - **Tooling churn** → record toolchain fingerprint each run; prefer structured `xcresulttool` subcommands.
 
 See `references/REFERENCE.md` for deeper troubleshooting and patterns.
@@ -218,6 +248,9 @@ See `references/REFERENCE.md` for deeper troubleshooting and patterns.
 
 - Orchestrator (canonical): `scripts/ui/ui_loop.sh`
 - Evidence extraction (canonical): `scripts/ui/xcresult_summary.sh`, `scripts/ui/xcresult_export.sh`
+- Attachment privacy helpers: `scripts/ui/patch_xctestrun_attachment_policy.py`, `scripts/ui/patch_xcscheme_attachment_policy.py`, `scripts/ui/xcresult_sanitize_attachments.py`
+- macOS permission triage: `scripts/macos/tcc_attribution_tail.sh`, `scripts/macos/collect_tcc_identities.sh`
+- Existing-project updater: `scripts/project/update_ui_loop_tools.sh`
 - Toolchain fingerprint (canonical): `scripts/ui/toolchain_fingerprint.sh`
 - Templates: `assets/templates/*.swift`
 - Deeper reference: `references/REFERENCE.md`

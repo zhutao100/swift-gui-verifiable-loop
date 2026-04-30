@@ -1,22 +1,19 @@
 # macOS UI testing permissions (Accessibility / Automation / Developer Tools)
 
-macOS UI tests (targeting macOS 15 and macOS 26) often require OS-level permissions so the test runner can drive the app like a user.
-
-In newer macOS releases, UI test runners can also fail to launch due to Gatekeeper/syspolicyd decisions. Treat the `.xcresult` bundle as the source of truth for what happened.
+macOS UI tests depend on Accessibility semantics and synthesized input events. On a fresh or headless machine, the first UI-test run may trigger a password or privacy prompt before the app under test launches. Agents must treat this as an operating-system gate, not as a flaky test to brute-force with repeated retries.
 
 ## Common prompts / toggles on a fresh machine
 
-If you run `xcodebuild test` / UI tests for the first time, macOS may show permission prompts.
-
 Common settings involved:
 
-- **System Settings → Privacy & Security → Accessibility** (UI automation helper / Xcode / your test launcher)
-- **System Settings → Privacy & Security → Automation** (Terminal/Xcode controlling other apps)
-- **System Settings → Privacy & Security → Developer Tools** (enable the terminal app you use to run `xcodebuild`, e.g. Terminal)
+- **System Settings → Privacy & Security → Accessibility**: UI automation helper / Xcode / stable wrapper app / agent terminal.
+- **System Settings → Privacy & Security → Automation**: one process controlling another by Apple Events.
+- **System Settings → Privacy & Security → Developer Tools**: the terminal or IDE used to run developer tools.
+- **PostEvent / Input monitoring-style controls**: event synthesis may be attributed to a different binary than the app under test.
+
+Do not guess which binary needs approval. Capture attribution evidence.
 
 ## "XCTest is trying to Enable UI Automation" password prompt
-
-On some macOS developer machines, the first UI-test run can block before app launch with a modal password prompt that says **"XCTest is trying to Enable UI Automation."**
 
 Symptoms in `.xcresult` / `xcodebuild`:
 
@@ -27,9 +24,47 @@ Symptoms in `.xcresult` / `xcodebuild`:
 Agent policy:
 
 1. Keep the failed `.xcresult` and exported diagnostics.
-2. Try the least-invasive mitigations once: `--adhoc-signing`, then `--reuse-build --derived-data /tmp/<name>`.
-3. If the same prompt/timeout repeats, stop retrying the UI test loop and report that the human must approve the password prompt or pre-grant the relevant Automation/Accessibility permission.
-4. When useful, continue qualitative verification with deterministic app launch arguments plus `screencapture` / window-level screenshots; label that evidence as a fallback, not a replacement for a passing XCUITest gate.
+2. Capture the responsible TCC attribution chain while reproducing the prompt:
+
+   ```bash
+   scripts/macos/tcc_attribution_tail.sh \
+     --duration 45 \
+     --out .artifacts/tcc-attribution.log
+   ```
+
+3. Print identities for candidate executables/apps before authoring PPPC:
+
+   ```bash
+   scripts/macos/collect_tcc_identities.sh \
+     /Applications/Xcode.app \
+     /Applications/Utilities/Terminal.app
+   ```
+
+4. Try the least-invasive local mitigations once:
+   - `--adhoc-signing`
+   - `--reuse-build --derived-data /tmp/<name>/DerivedData`
+5. If the same prompt/timeout repeats, stop retrying the UI-test loop and report that a human or device-management policy must approve the permission.
+
+## PPPC / MDM option for managed machines
+
+For managed macOS machines, a Privacy Preferences Policy Control (PPPC) payload can preconfigure privacy classes for specific apps/binaries. Use MDM or your organization’s PPPC tooling; this skill includes only a template:
+
+```bash
+cp assets/templates/PPPC-UI-Testing.mobileconfig.template /tmp/PPPC-UI-Testing.mobileconfig
+```
+
+Then replace placeholders with values collected from:
+
+```bash
+scripts/macos/tcc_attribution_tail.sh --duration 45 --out .artifacts/tcc.log
+scripts/macos/collect_tcc_identities.sh /path/to/responsible.app-or-binary
+```
+
+Important caveats:
+
+- PPPC is an administrative deployment mechanism. It is not an agent-side bypass for a regular unmanaged developer Mac.
+- The responsible path may be Xcode, an Xcode helper, the test runner app, Terminal, a CI agent, or a wrapper binary. Confirm by TCC logs.
+- Apple platform behavior can change between macOS releases. Revalidate on every macOS/Xcode major upgrade.
 
 ## Gatekeeper / syspolicyd symptoms (macOS 15+)
 
@@ -46,36 +81,24 @@ Practical policy:
 
 Do not rely on `spctl --assess` as the only oracle in this workflow; it can be noisy for Xcode-built products and UI test runners.
 
-## Mitigations (prefer the least invasive)
-
-- Prefer `build-for-testing` + `test-without-building` runs (see `references/xcresult-bundles.md`).
-- If you hit runner launch issues, try placing DerivedData under `/tmp` for the UI loop (example: `--reuse-build --derived-data /tmp/ui-loop/DerivedData`).
-- If the runner is still blocked and you are okay with a signing override, try `scripts/ui/ui_loop.sh --adhoc-signing` (adds `CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`).
-- Avoid disabling signing entirely (for example `CODE_SIGNING_ALLOWED=NO`); it can break UI runner integrity.
-
 ## CI environments
 
 Headless CI runners generally cannot click permission prompts.
 
 Practical options:
 
-1. **Prefer snapshots + unit tests in CI**, and run macOS UI tests only on developer machines.
-2. **Use self-hosted macOS runners** where you can preconfigure permissions interactively.
-3. **Use a CI provider that supports preconfigured macOS UI testing** (some hosted offerings document workarounds/constraints).
-
-Do not rely on brittle, security-bypassing techniques.
+1. Prefer snapshots + unit tests in CI, and run macOS UI tests only on prepared developer or self-hosted machines.
+2. Use MDM-managed self-hosted macOS runners with PPPC where organizationally appropriate.
+3. Use a dedicated clean login session, clean desktop, or disposable VM so any accidental full-screen screenshot contains no user data.
+4. Treat macOS UI smoke tests as an outer-loop gate, not the only proof of correctness.
 
 ## Evidence capture still applies
 
-Even when UI tests are constrained, keep the core contract:
+Even when UI tests are permission-constrained, keep the core contract:
 
-- always keep the `.xcresult` bundle
-- export attachments and diagnostics
+- always keep the `.xcresult` bundle locally
+- export diagnostics/logs
 - record the toolchain fingerprint
+- inspect only sanitized attachments when agents are involved
 
-That preserves a machine-verifiable loop for agents.
-
-## References
-
-- Apple: “Recording UI automation for testing” (mentions enabling Xcode’s helper under Accessibility privacy settings)
-- CI note: CircleCI’s “Testing macOS applications” (describes permission prompts and headless CI limitations)
+Related: `references/artifact-privacy.md`.

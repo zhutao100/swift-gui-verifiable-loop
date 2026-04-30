@@ -9,6 +9,8 @@ This file is intentionally more detailed than `SKILL.md`. Keep `SKILL.md` short 
 3. **Snapshot testing is a primary verifiability primitive** for view correctness, but must be scoped and environment-controlled.
 4. **XCUITest should be small + semantic**, and strengthened with accessibility identifiers, accessibility audits, and attachments.
 5. **Deterministic entry harnesses** (launch args/env/URLs) are key to removing flakiness and shortening UI paths.
+6. **macOS UI-test permissions are OS gates, not test flakiness**; collect TCC attribution evidence and use human/MDM approval rather than repeated retries.
+7. **Agent-facing screenshots must be app-scoped or sanitized**; automatic full-screen UI-test screenshots are privacy-sensitive and poor model input.
 
 ## Platform scope (avoid ambiguity)
 
@@ -28,6 +30,19 @@ Most mechanics are shared (`xcodebuild`, `.xcresult`, snapshots), but some detai
 - Gate B (visual regression): snapshots of isolated view states
 - Gate C (UI smoke): small XCUITests + `performAccessibilityAudit()`
 - Evidence: `.xcresult` + exported attachments/diagnostics + toolchain fingerprint
+
+## Updating projects set up by older skill versions
+
+If a target repo already contains `scripts/ui/ui_loop.sh`, do not assume it has the current attachment privacy, `.xctestrun` patching, or summary-gating behavior. Refresh the managed scripts from this skill first:
+
+```bash
+swift-gui-verifiable-loop/scripts/project/update_ui_loop_tools.sh \
+  --apply \
+  --platform macos \
+  /path/to/target-repo
+```
+
+Use `--check` in CI or before commits to detect drift. The updater intentionally touches only skill-owned scripts under `scripts/ui`, plus `scripts/macos` or `scripts/ios` helpers selected by `--platform`.
 
 ## Architecture patterns that maximize determinism
 
@@ -74,6 +89,7 @@ If a UI smoke test flakes:
 - For menu bar extras on macOS, do not assume the `NSStatusItem` is hittable even when it exists in the accessibility tree; prefer a launch harness that opens the popover/context menu.
 - Disable animations in test mode.
 - Export `.xcresult` attachments and inspect screenshots/logs.
+- For agent runs, inspect sanitized `attachments/` and avoid raw full-screen screenshots.
 
 ## `.xcresult` stability guidance
 
@@ -95,3 +111,8 @@ For features that are hard to validate visually, a high-ROI pattern is a debug-o
 This converts “GUI correctness” into an agent-readable, deterministic artifact.
 
 See `references/xcresult-bundles.md`.
+
+## Related references
+
+- `references/artifact-privacy.md` — attachment retention, screenshot sanitization, and safe agent artifact policy.
+- `references/macos-ui-testing-permissions.md` — TCC prompt triage, PPPC notes, and headless constraints.

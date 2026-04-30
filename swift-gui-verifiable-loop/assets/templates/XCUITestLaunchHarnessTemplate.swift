@@ -38,11 +38,19 @@ final class SmokeFlowTests: XCTestCase {
     }
 
     // Evidence enrichment on failure:
+    // Prefer element/window screenshots over XCUIScreen.main.screenshot(), which can
+    // capture the full desktop on macOS.
     if !app.staticTexts["settings.savedBanner"].waitForExistence(timeout: 5) {
-      let shot = XCUIScreen.main.screenshot()
-      let att = XCTAttachment(screenshot: shot)
+      let att = XCTAttachment(screenshot: mainWindow.screenshot())
+      att.name = "main-window-after-save"
       att.lifetime = .keepAlways
       add(att)
+
+      let debug = XCTAttachment(string: app.debugDescription)
+      debug.name = "accessibility-tree-after-save"
+      debug.lifetime = .keepAlways
+      add(debug)
+
       XCTFail("Expected saved banner")
     }
   }

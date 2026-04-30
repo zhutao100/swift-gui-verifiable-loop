@@ -112,6 +112,50 @@ xcodebuild \
   test-without-building
 ```
 
+
+## Attachment retention and agent-safe export
+
+Xcode UI testing can keep automatic system screenshots in the result bundle. For agent workflows, prefer suppressing automatic screenshots before the `.xcresult` is written:
+
+```bash
+scripts/ui/ui_loop.sh \
+  --workspace App.xcworkspace \
+  --scheme App \
+  --test-plan Smoke \
+  --destination 'platform=macOS' \
+  --reuse-build \
+  --system-attachment-lifetime keepNever \
+  --sanitize-screenshots redact-suspect \
+  --delete-raw-attachments
+```
+
+The `--system-attachment-lifetime keepNever` option patches the generated `.xctestrun` after `build-for-testing` and before `test-without-building`. This controls automatic XCTest UI screenshots. If tests add explicit `XCTAttachment` instances, control those separately in test code or pass `--user-attachment-lifetime <keepAlways|deleteOnSuccess|keepNever>`.
+
+For one-off manual patching:
+
+```bash
+scripts/ui/patch_xctestrun_attachment_policy.py "$XCTESTRUN" \
+  --system-attachment-lifetime keepNever
+```
+
+For shared scheme defaults:
+
+```bash
+scripts/ui/patch_xcscheme_attachment_policy.py \
+  App.xcodeproj/xcshareddata/xcschemes/App.xcscheme \
+  --system-attachment-lifetime keepNever
+```
+
+For post-export artifact hygiene:
+
+```bash
+scripts/ui/xcresult_export.sh results.xcresult .artifacts/ui/run \
+  --sanitize-screenshots redact-suspect \
+  --delete-raw-attachments
+```
+
+See `references/artifact-privacy.md` for the privacy policy and screenshot strategy comparison.
+
 ## xcresulttool commands used by this skill
 
 This skill prefers newer structured subcommands when available, and falls back to legacy JSON extraction on older toolchains.

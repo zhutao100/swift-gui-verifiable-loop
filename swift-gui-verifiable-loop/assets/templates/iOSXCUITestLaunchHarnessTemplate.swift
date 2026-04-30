@@ -43,11 +43,19 @@ final class iOSSmokeFlowTests: XCTestCase {
     saveButton.tap()
 
     // Evidence enrichment on failure:
+    // Prefer an app/window/root element screenshot over XCUIScreen.main.screenshot()
+    // so exported attachments stay small and app-scoped.
     if !app.staticTexts["settings.savedBanner"].waitForExistence(timeout: 5) {
-      let shot = XCUIScreen.main.screenshot()
-      let att = XCTAttachment(screenshot: shot)
+      let att = XCTAttachment(screenshot: app.screenshot())
+      att.name = "app-after-save"
       att.lifetime = .keepAlways
       add(att)
+
+      let debug = XCTAttachment(string: app.debugDescription)
+      debug.name = "accessibility-tree-after-save"
+      debug.lifetime = .keepAlways
+      add(debug)
+
       XCTFail("Expected saved banner")
     }
   }

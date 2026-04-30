@@ -26,6 +26,19 @@ Before iterating, collect these constants from the target project and write them
 
 Agents must not guess these values.
 
+## Refreshing an existing target setup
+
+When a target project already has older copied loop scripts, update the skill-owned scripts before using current options such as `--system-attachment-lifetime` or `--sanitize-screenshots`:
+
+```bash
+swift-gui-verifiable-loop/scripts/project/update_ui_loop_tools.sh \
+  --apply \
+  --platform macos \
+  /path/to/target-repo
+```
+
+Use `--platform ios` for iOS-only apps and `--platform both` for shared macOS/iOS repos. The updater copies only skill-owned script files; keep project-specific docs, schemes, launch harnesses, and local helper scripts under normal review.
+
 ## Default iteration loop
 
 1. **Make one coherent change** (keep diffs small).
@@ -37,6 +50,20 @@ Agents must not guess these values.
    scripts/ui/ui_loop.sh \
      --scheme App \
      --test-plan Smoke
+   ```
+
+   Agent-safe macOS UI example:
+
+   ```bash
+   scripts/ui/ui_loop.sh \
+     --workspace App.xcworkspace \
+     --scheme App \
+     --test-plan Smoke \
+     --destination 'platform=macOS' \
+     --reuse-build \
+     --system-attachment-lifetime keepNever \
+     --sanitize-screenshots redact-suspect \
+     --delete-raw-attachments
    ```
 
    iOS Simulator example:
@@ -52,7 +79,8 @@ Agents must not guess these values.
 
 3. Inspect `<artifacts-dir>/<run-id>/summary.json` (default artifacts dir: `./.artifacts/ui`).
 4. If failed, inspect exported artifacts:
-   - `<artifacts-dir>/<run-id>/attachments/**`
+   - `<artifacts-dir>/<run-id>/attachments/**` (sanitized when screenshot sanitization was enabled)
+   - `<artifacts-dir>/<run-id>/attachment_sanitization.json`
    - `<artifacts-dir>/<run-id>/diagnostics/**`
    - `<artifacts-dir>/<run-id>/logs/**`
    - `<artifacts-dir>/<run-id>/xcodebuild-*.log`
@@ -103,6 +131,16 @@ Rules:
 - Never record in CI (use `record: .never` there; see `references/snapshot-testing.md`).
 - If a snapshot diff fails, decide: intentional UI change (re-record) vs regression (fix UI).
 - Keep snapshot surfaces narrow (isolated states), and pin environment (device config, locale, appearance).
+
+
+
+## Agent-safe artifact policy
+
+- Prefer `--reuse-build --system-attachment-lifetime keepNever` for macOS UI smoke tests. This suppresses automatic XCTest UI screenshots before the `.xcresult` is produced.
+- Prefer `--sanitize-screenshots redact-suspect --delete-raw-attachments` when exporting attachments for model inspection.
+- Agents inspect `attachments/`, never `attachments_raw/`, unless a human explicitly approves raw artifact review.
+- UI tests should attach window/root-element screenshots for agent-facing macOS runs. Use `XCUIApplication.screenshot()` only after confirming it is app-scoped on that runner, and do not use `XCUIScreen.main.screenshot()`.
+- If macOS prompts for UI automation permission, stop after one mitigation pass and collect TCC attribution evidence with `scripts/macos/tcc_attribution_tail.sh`; do not loop indefinitely.
 
 ## XCUITest workflow rules
 
@@ -159,3 +197,6 @@ When a run fails:
 - `references/REFERENCE.md` — design principles and troubleshooting
 - `references/snapshot-testing.md` — SnapshotTesting setup + recording policy
 - `references/xcresult-bundles.md` — `.xcresult` mechanics and extraction commands
+- `references/artifact-privacy.md` — screenshot retention, redaction, cropping, and agent-safe artifact policy
+- `references/macos-ui-testing-permissions.md` — TCC prompt triage and PPPC notes
+- `scripts/project/update_ui_loop_tools.sh` — refresh older target projects with the current managed scripts
