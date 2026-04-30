@@ -125,11 +125,13 @@ scripts/ui/ui_loop.sh \
   --destination 'platform=macOS' \
   --reuse-build \
   --system-attachment-lifetime keepNever \
-  --sanitize-screenshots redact-suspect \
+  --sanitize-screenshots keep \
   --delete-raw-attachments
 ```
 
 The `--system-attachment-lifetime keepNever` option patches the generated `.xctestrun` after `build-for-testing` and before `test-without-building`. This controls automatic XCTest UI screenshots. If tests add explicit `XCTAttachment` instances, control those separately in test code or pass `--user-attachment-lifetime <keepAlways|deleteOnSuccess|keepNever>`.
+
+Use `--sanitize-screenshots keep` only when UI tests attach scoped app-window/root screenshots or crop menu-bar status surfaces before attaching them. Use `redact-suspect` when placeholder images are acceptable and privacy matters more than readable visual evidence.
 
 For one-off manual patching:
 
@@ -150,7 +152,7 @@ For post-export artifact hygiene:
 
 ```bash
 scripts/ui/xcresult_export.sh results.xcresult .artifacts/ui/run \
-  --sanitize-screenshots redact-suspect \
+  --sanitize-screenshots keep \
   --delete-raw-attachments
 ```
 

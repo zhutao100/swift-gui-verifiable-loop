@@ -112,7 +112,7 @@ scripts/ui/ui_loop.sh \
   --destination 'platform=macOS' \
   --reuse-build \
   --system-attachment-lifetime keepNever \
-  --sanitize-screenshots redact-suspect \
+  --sanitize-screenshots keep \
   --delete-raw-attachments
 ```
 
@@ -135,7 +135,7 @@ Outputs per run:
 - `<artifacts-dir>/<run-id>/xcodebuild-*.log` (captured `xcodebuild` logs unless `VERBOSE=1`)
 - `<artifacts-dir>/<run-id>/attachments/**` (exported screenshots/attachments; sanitized when `--sanitize-screenshots` is used)
 - `<artifacts-dir>/<run-id>/attachments_raw/**` (raw export only when screenshot sanitization is enabled and raw deletion is not requested)
-- `<artifacts-dir>/<run-id>/attachment_sanitization.json` (sanitizer report when enabled)
+- `<artifacts-dir>/<run-id>/attachment_sanitization.json` (sanitizer report when a transforming policy is used)
 - `<artifacts-dir>/<run-id>/xctestrun-attachment-policy.json` (`.xctestrun` patch report when attachment lifetime policy is patched)
 - `<artifacts-dir>/<run-id>/diagnostics/**` (crash logs, diagnostics)
 
@@ -147,7 +147,7 @@ If you prefer manual commands, see `references/xcresult-bundles.md`.
 
 - macOS UI tests may require Accessibility/Automation permissions for the UI test runner. See `references/macos-ui-testing-permissions.md`.
 - If macOS shows an "XCTest is trying to Enable UI Automation" password prompt, preserve the `.xcresult`, capture TCC attribution with `scripts/macos/tcc_attribution_tail.sh`, try the documented mitigations once, then ask the human or MDM policy owner to grant the OS permission instead of repeatedly rerunning.
-- For agent-facing macOS runs, prefer `--reuse-build --system-attachment-lifetime keepNever --sanitize-screenshots redact-suspect --delete-raw-attachments` so automatic full-screen screenshots are discarded and exported attachments are sanitized. See `references/artifact-privacy.md`.
+- For agent-facing macOS visual evidence, prefer `--reuse-build --system-attachment-lifetime keepNever --sanitize-screenshots keep --delete-raw-attachments` after UI tests attach only app-window/root-element screenshots or cropped status-surface screenshots. Use `redact-suspect` only when privacy is more important than readable PNG evidence. See `references/artifact-privacy.md`.
 - iOS simulator runs benefit from simulator-state and permission control via `simctl`. See `references/ios-simulator-determinism.md`.
 
 ## Step 2 — Add snapshot tests for stable UI surfaces

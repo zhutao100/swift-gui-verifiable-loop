@@ -62,7 +62,7 @@ Use `--platform ios` for iOS-only apps and `--platform both` for shared macOS/iO
      --destination 'platform=macOS' \
      --reuse-build \
      --system-attachment-lifetime keepNever \
-     --sanitize-screenshots redact-suspect \
+     --sanitize-screenshots keep \
      --delete-raw-attachments
    ```
 
@@ -79,8 +79,8 @@ Use `--platform ios` for iOS-only apps and `--platform both` for shared macOS/iO
 
 3. Inspect `<artifacts-dir>/<run-id>/summary.json` (default artifacts dir: `./.artifacts/ui`).
 4. If failed, inspect exported artifacts:
-   - `<artifacts-dir>/<run-id>/attachments/**` (sanitized when screenshot sanitization was enabled)
-   - `<artifacts-dir>/<run-id>/attachment_sanitization.json`
+   - `<artifacts-dir>/<run-id>/attachments/**`
+   - `<artifacts-dir>/<run-id>/attachment_sanitization.json` (when a transforming sanitizer policy is used)
    - `<artifacts-dir>/<run-id>/diagnostics/**`
    - `<artifacts-dir>/<run-id>/logs/**`
    - `<artifacts-dir>/<run-id>/xcodebuild-*.log`
@@ -137,7 +137,8 @@ Rules:
 ## Agent-safe artifact policy
 
 - Prefer `--reuse-build --system-attachment-lifetime keepNever` for macOS UI smoke tests. This suppresses automatic XCTest UI screenshots before the `.xcresult` is produced.
-- Prefer `--sanitize-screenshots redact-suspect --delete-raw-attachments` when exporting attachments for model inspection.
+- Prefer `--sanitize-screenshots keep --delete-raw-attachments` when UI tests attach app-window/root-element screenshots or cropped menu-bar status surfaces. This preserves readable PNG evidence while still deleting any raw export staging directory.
+- Use `--sanitize-screenshots redact-suspect` only for privacy triage runs where placeholder images are acceptable.
 - Agents inspect `attachments/`, never `attachments_raw/`, unless a human explicitly approves raw artifact review.
 - UI tests should attach window/root-element screenshots for agent-facing macOS runs. Use `XCUIApplication.screenshot()` only after confirming it is app-scoped on that runner, and do not use `XCUIScreen.main.screenshot()`.
 - If macOS prompts for UI automation permission, stop after one mitigation pass and collect TCC attribution evidence with `scripts/macos/tcc_attribution_tail.sh`; do not loop indefinitely.

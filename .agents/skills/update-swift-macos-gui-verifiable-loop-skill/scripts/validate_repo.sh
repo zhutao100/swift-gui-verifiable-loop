@@ -55,6 +55,9 @@ fi
 if ! grep -q -- "--sanitize-screenshots" "$SKILL_DIR/scripts/ui/ui_loop.sh"; then
   fail "ui_loop.sh must expose --sanitize-screenshots"
 fi
+if ! grep -q -- "--sanitize-screenshots keep" "$SKILL_DIR/SKILL.md"; then
+  fail "SKILL.md must recommend keeping scoped/cropped visual evidence for agent-safe macOS runs"
+fi
 if ! grep -q "SEATBELT_SANDBOX_WORKSPACE_ROOT" "$SKILL_DIR/scripts/ui/ui_loop.sh"; then
   fail "ui_loop.sh must seed SEATBELT_SANDBOX_WORKSPACE_ROOT for sandbox-aware projects"
 fi

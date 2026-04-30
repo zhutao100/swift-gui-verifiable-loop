@@ -19,11 +19,11 @@ swift-gui-verifiable-loop/scripts/ui/ui_loop.sh \
   --destination 'platform=macOS' \
   --reuse-build \
   --system-attachment-lifetime keepNever \
-  --sanitize-screenshots redact-suspect \
+  --sanitize-screenshots keep \
   --delete-raw-attachments
 ```
 
-This suppresses automatic full-screen XCTest screenshots via the generated `.xctestrun` and redacts large exported image attachments before agent inspection.
+This suppresses automatic full-screen XCTest screenshots via the generated `.xctestrun` and keeps explicit app-window or cropped UI-test attachments as the agent-facing evidence.
 
 iOS Simulator example:
 
