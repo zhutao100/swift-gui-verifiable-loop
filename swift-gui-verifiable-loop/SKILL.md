@@ -146,6 +146,9 @@ If you prefer manual commands, see `references/xcresult-bundles.md`.
 ## Platform notes (read once)
 
 - macOS UI tests may require Accessibility/Automation permissions for the UI test runner. See `references/macos-ui-testing-permissions.md`.
+- For unattended agent runs, prefer a prepared disposable macOS VM when available
+  (for example a GhostVM `xcode-ui-ready` snapshot) over repeatedly running on a
+  real host that still needs interactive approval.
 - If macOS shows an "XCTest is trying to Enable UI Automation" password prompt, preserve the `.xcresult`, capture TCC attribution with `scripts/macos/tcc_attribution_tail.sh`, try the documented mitigations once, then ask the human or MDM policy owner to grant the OS permission instead of repeatedly rerunning.
 - For agent-facing macOS visual evidence, prefer `--reuse-build --system-attachment-lifetime keepNever --sanitize-screenshots keep --delete-raw-attachments` after UI tests attach only app-window/root-element screenshots or cropped status-surface screenshots. Use `redact-suspect` only when privacy is more important than readable PNG evidence. See `references/artifact-privacy.md`.
 - iOS simulator runs benefit from simulator-state and permission control via `simctl`. See `references/ios-simulator-determinism.md`.

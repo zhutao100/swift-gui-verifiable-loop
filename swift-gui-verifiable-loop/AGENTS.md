@@ -89,6 +89,7 @@ Use `--platform ios` for iOS-only apps and `--platform both` for shared macOS/iO
 
 Tip: add `/.artifacts/` to your project’s `.gitignore`.
 Tip: set `VERBOSE=1` when you want live `xcodebuild` output instead of per-run log files.
+Tip: `scripts/ui/ui_loop.sh` and `scripts/ui/xcresult_export.sh` default to `/usr/bin/python3` for macOS runner compatibility; set `PYTHON_BIN` only when a project requires a different interpreter.
 
 ## Fast inner loop (target one test)
 
@@ -141,6 +142,9 @@ Rules:
 - Use `--sanitize-screenshots redact-suspect` only for privacy triage runs where placeholder images are acceptable.
 - Agents inspect `attachments/`, never `attachments_raw/`, unless a human explicitly approves raw artifact review.
 - UI tests should attach window/root-element screenshots for agent-facing macOS runs. Use `XCUIApplication.screenshot()` only after confirming it is app-scoped on that runner, and do not use `XCUIScreen.main.screenshot()`.
+- For unattended macOS UI loops, prefer a prepared disposable VM (for example
+  GhostVM with an `xcode-ui-ready` snapshot) when the real host still needs
+  interactive approval.
 - If macOS prompts for UI automation permission, stop after one mitigation pass and collect TCC attribution evidence with `scripts/macos/tcc_attribution_tail.sh`; do not loop indefinitely.
 
 ## XCUITest workflow rules

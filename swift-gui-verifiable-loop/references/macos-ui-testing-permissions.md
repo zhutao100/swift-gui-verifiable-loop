@@ -66,6 +66,28 @@ Important caveats:
 - The responsible path may be Xcode, an Xcode helper, the test runner app, Terminal, a CI agent, or a wrapper binary. Confirm by TCC logs.
 - Apple platform behavior can change between macOS releases. Revalidate on every macOS/Xcode major upgrade.
 
+## Disposable VM option for unattended agents
+
+For unmanaged developer Macs, a prepared disposable macOS VM is the practical
+agent-safe path when no human can approve prompts during the run. If the
+`ghostvm-safe-testing` skill is installed, prepare a VM snapshot for Xcode UI
+testing and run this skill's `scripts/ui/ui_loop.sh` inside that guest.
+
+Expected preparation contract:
+
+- a clean base snapshot is reverted before each run
+- the guest has Xcode installed and first-launch setup completed
+- Xcode UI testing bootstrap has enabled Automation Mode without per-run
+  authentication
+- TCC rows are seeded for GhostTools plus Xcode/XCTest candidates such as Xcode,
+  Xcode Helper, `xcodebuild`, and `xcrun`
+- host project inputs are mounted read-only and evidence/artifacts are exported
+  through a dedicated writable share
+
+This does not change the policy for a real host: do not loop on an interactive
+password prompt there. Move the test to a prepared VM, use PPPC/MDM, or ask the
+permission owner to approve the gate.
+
 ## Gatekeeper / syspolicyd symptoms (macOS 15+)
 
 You may see UI test failures like:
